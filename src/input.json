@@ -1,0 +1,14 @@
+[
+	{
+		"logfile": "logs.txt",
+		"random_seed": 120
+	},
+	{
+		"model": "random_forest",
+		"num_trees": 150
+	},
+	{
+		"model": "neural_network",
+		"hidden_layer_size": [100, 100]
+	}
+]
