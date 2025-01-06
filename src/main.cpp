@@ -1,14 +1,15 @@
 #include "utils/read_input.cpp"
 #include "utils/logging.cpp"
-
+using namespace ml;
 using namespace std;
 
-int main(int argc, char * argv [])
+int main(int argc, char *argv[])
 {
-	string inputFileName = "input.json";
-	if (argc > 1) inputFileName = argv[1];
-	ReadInput inputReader (inputFileName);
-	json params = inputReader.readJson(inputFileName);
+    string inputFileName = "input.json";
+    if (argc > 1)
+        inputFileName = argv[1];
+    ReadInput inputReader(inputFileName);
+    json params = inputReader.readJson();
     Logger logger("logfile.txt"); // Create logger instance
 
     // Example usage of the logger
@@ -18,5 +19,3 @@ int main(int argc, char * argv [])
 
     return 0;
 }
-
-
