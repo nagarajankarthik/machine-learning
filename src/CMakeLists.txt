@@ -1,11 +1,18 @@
-# CMakeLists.txt
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.20)
 
 # set the project name and version
-project(Machine Learning VERSION 1.0)
+project(MachineLearning VERSION 1.0)
 
-add_subdirectory(utils)
-add_executable(main main.cpp)
 # specify the C++ standard
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
+
+add_executable(ml)
+target_sources(ml PRIVATE "main.cpp")
+target_include_directories(ml PRIVATE "${PROJECT_SOURCE_DIR}")
+# add subdirectories
+add_subdirectory(utils)
+
+# add executables
+
+install(TARGETS ml DESTINATION bin)
