@@ -3,8 +3,8 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "../nlohmann/json.hpp"
-using json = nlohmann::json;
+#include "json.hpp"
+#include <iostream>
 
 namespace ml
 {
@@ -21,13 +21,13 @@ namespace ml
     ReadInput(std::string inputFileName) { inp.open(inputFileName); };
     ~ReadInput() { inp.close(); };
 
-    json readJson()
+    nlohmann::json_abi_v3_11_3::json readJson()
     {
-      // read a JSON file
-      json params;
-      inp >> params;
 
-      return params;
+      std::stringstream buffer;
+      buffer << inp.rdbuf();
+      auto inputParameters = nlohmann::json::parse(buffer.str());
+      return inputParameters;
     }
 
     // trim from start (in place)
