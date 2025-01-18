@@ -47,3 +47,7 @@ logs/*
 *.exe
 *.out
 *.app
+
+# Doxygen files
+docs/html
+docs/latex
