@@ -10,9 +10,11 @@
 import os, subprocess
 from pathlib import Path
 
-def configureDoxyfile(base_dir):
+
+def run_doxygen(base_dir):
     """
-    Updates input and output directories in Doxyfile.
+    Creates a new Doxyfile in the build directory and 
+    uses it to run doxygen.
     """
     docs_dir = os.path.join(base_dir,"docs")
     src_dir = os.path.join(base_dir,"src")
@@ -29,6 +31,7 @@ def configureDoxyfile(base_dir):
     subprocess.call(f"touch {output_doxyfile}", shell=True)
     with open(output_doxyfile, 'w') as file:
         file.write(filedata)
+    subprocess.call(f"doxygen {output_doxyfile}", shell=True)
 
 # Check if we're running on Read the Docs' servers
 read_the_docs_build = os.environ.get('READTHEDOCS', None) == 'True'
@@ -37,8 +40,7 @@ breathe_projects = {}
 base_dir = Path(__file__).parent.parent.parent
 breathe_projects['MachineLearning'] = os.path.join(base_dir,"build", "docs","doxygen","xml")
 if read_the_docs_build:
-    configureDoxyfile(base_dir)
-    subprocess.call('cd ..; doxygen', shell=True)
+    run_doxygen(base_dir)
 
 
 html_theme = "sphinx_rtd_theme"
