@@ -25,6 +25,8 @@ def configureDoxyfile(base_dir):
     filedata = filedata.replace('@DOXYGEN_INPUT_DIR@', src_dir)
     filedata = filedata.replace('@DOXYGEN_OUTPUT_DIR@', output_dir)
 
+    subprocess.call(f"mkdir -p {output_dir}", shell=True)
+    subprocess.call(f"touch {output_doxyfile}", shell=True)
     with open(output_doxyfile, 'w') as file:
         file.write(filedata)
 
