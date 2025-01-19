@@ -6,10 +6,19 @@
 
 using namespace std;
 
-namespace ml {
+namespace ml
+{
 
-	class DecisionTree {
-		public:
-			string impurity_method = "gini";
+	/**
+	 * Implement decision tree using recursive partitioning algorithm.
+	 */
+
+	class DecisionTree
+	{
+	public:
+		/**
+		 * Criterion to quantify individual node impurities.
+		 */
+		string impurity_method = "gini";
 	};
 }
