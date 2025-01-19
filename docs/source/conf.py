@@ -36,7 +36,7 @@ base_dir = Path(__file__).parent.parent.parent
 breathe_projects['MachineLearning'] = os.path.join(base_dir,"build", "docs","doxygen","xml")
 if read_the_docs_build:
     configureDoxyfile(base_dir)
-    subprocess.call('doxygen', shell=True)
+    subprocess.call('cd ..; doxygen', shell=True)
 
 
 html_theme = "sphinx_rtd_theme"
