@@ -2,7 +2,8 @@
 # Read the Docs configuration file
 # See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
 
-# Required
+# Required. This is not the project version number in docs/source/conf.py.
+# Do NOT modify the next line.
 version: 2
 
 # Set the OS, Python version and other tools you might need
