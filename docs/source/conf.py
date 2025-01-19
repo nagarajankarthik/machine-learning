@@ -8,16 +8,15 @@
 
 
 import os, subprocess
-import sphinx_rtd_theme
+from pathlib import Path
 
-def configureDoxyfile():
+def configureDoxyfile(base_dir):
     """
     Updates input and output directories in Doxyfile.
     """
-    work_dir = os.getcwd()
-    docs_dir = os.path.join(work_dir,"docs")
-    src_dir = os.path.join(work_dir,"src")
-    output_dir = os.path.join(work_dir, "build","docs")
+    docs_dir = os.path.join(base_dir,"docs")
+    src_dir = os.path.join(base_dir,"src")
+    output_dir = os.path.join(base_dir, "build","docs")
     template_doxyfile = os.path.join(docs_dir,"Doxyfile")
     output_doxyfile = os.path.join(output_dir,"Doxyfile")
     with open(template_doxyfile, 'r') as file :
@@ -32,14 +31,12 @@ def configureDoxyfile():
 # Check if we're running on Read the Docs' servers
 read_the_docs_build = os.environ.get('READTHEDOCS', None) == 'True'
 
-# breathe_projects = {"Machine Learning":'build/docs/doxygen/xml'}
 breathe_projects = {}
+base_dir = Path(__file__).parent.parent
+breathe_projects['MachineLearning'] = os.path.join(base_dir,"build", "docs","doxygen","xml")
 if read_the_docs_build:
-    input_dir = '../src'
-    output_dir = 'build'
-    configureDoxyfile(input_dir, output_dir)
+    configureDoxyfile(base_dir)
     subprocess.call('doxygen', shell=True)
-    breathe_projects['MachineLearning'] = output_dir + '/docs/doxygen/xml'
 
 
 html_theme = "sphinx_rtd_theme"
