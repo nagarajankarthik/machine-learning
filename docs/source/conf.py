@@ -32,7 +32,7 @@ def configureDoxyfile(base_dir):
 read_the_docs_build = os.environ.get('READTHEDOCS', None) == 'True'
 
 breathe_projects = {}
-base_dir = Path(__file__).parent.parent
+base_dir = Path(__file__).parent.parent.parent
 breathe_projects['MachineLearning'] = os.path.join(base_dir,"build", "docs","doxygen","xml")
 if read_the_docs_build:
     configureDoxyfile(base_dir)
