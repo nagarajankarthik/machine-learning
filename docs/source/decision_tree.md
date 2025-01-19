@@ -4,7 +4,7 @@ The recursive partitioning algorithm is implemented using gini impurity.
 
 
 ```{eval-rst}
-.. doxygenclass:: ml::DecisionTree
+.. doxygenclass:: ml::DecisionTreeClassifier
    :members:
 
 ```
