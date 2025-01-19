@@ -16,7 +16,7 @@ def configureDoxyfile(base_dir):
     """
     docs_dir = os.path.join(base_dir,"docs")
     src_dir = os.path.join(base_dir,"src")
-    output_dir = os.path.join(base_dir, "build","docs")
+    output_dir = os.path.join(base_dir, "build","docs","doxygen")
     template_doxyfile = os.path.join(docs_dir,"Doxyfile")
     output_doxyfile = os.path.join(output_dir,"Doxyfile")
     with open(template_doxyfile, 'r') as file :
