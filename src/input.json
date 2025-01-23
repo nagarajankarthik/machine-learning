@@ -7,7 +7,7 @@
 		{
 			"model": "random_forest",
 			"data": "data.csv",
-			"num_trees": 150
+			"number_trees": 150
 		},
 		{
 			"model": "neural_network",
