@@ -9,8 +9,8 @@ int main(int argc, char *argv[])
     string inputFileName = "input.json";
     if (argc > 1)
         inputFileName = argv[1];
-    ReadInput inputReader(inputFileName);
-    auto inputParameters = inputReader.readJson();
+    ReadInput inputReader;
+    auto inputParameters = inputReader.readJson(inputFileName);
 
     string logFileName = inputParameters["general"]["logfile"];
 
