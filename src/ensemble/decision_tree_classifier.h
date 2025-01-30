@@ -20,7 +20,7 @@ namespace ml
 	{
 	public:
 		/**
-		 * Pointer to a an instance of Logger.
+		 * Pointer to an instance of Logger.
 		 */
 		Logger * logger ;
 
