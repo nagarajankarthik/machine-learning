@@ -6,7 +6,7 @@
 	"models": [
 		{
 			"model": "random_forest",
-			"data": "data.csv",
+			"data": "/mnt/c/Users/65915/example_datasets/iris_processed.csv",
 			"number_trees": 150
 		},
 		{
