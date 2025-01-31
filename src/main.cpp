@@ -34,12 +34,12 @@ int main(int argc, char *argv[])
 	        vector<vector<double>> test_features {};
 		vector<vector<double>> train_outputs {};	
 		vector<vector<double>> test_outputs {};
-		bool shuffle = true;
+		bool shuffle_data = true;
 		double train_ratio = 0.75;
-		if (model_parameters.contains("shuffle_data")) shuffle = model_parameters["shuffle_data"];
+		if (model_parameters.contains("shuffle_data")) shuffle_data = model_parameters["shuffle_data"];
 		if (model_parameters.contains("train_ratio")) train_ratio = model_parameters["train_ratio"];
 		// train-test split
-		train_test_split(features, outputs, train_features, train_outputs, test_features, test_outputs, train_ratio, shuffle, &logger);
+		train_test_split(features, outputs, train_features, train_outputs, test_features, test_outputs, train_ratio, shuffle_data, &logger);
 		// type conversion of outputs for classification algorithms	
 		vector<vector<int>> train_outputs_int = double_to_int(train_outputs) ;
 		vector<vector<int>> test_outputs_int = double_to_int(test_outputs) ;
@@ -48,6 +48,8 @@ int main(int argc, char *argv[])
 			DecisionTreeClassifier decision_tree(model_parameters, &logger);
 			logger.log(INFO, "Training " + model_type);
 			decision_tree.fit(train_features, train_outputs_int);
+			vector<vector<int>> predictions = decision_tree.predict(test_features);
+			vector<vector<int>> confusion_matrix = get_confusion_matrix(predictions, test_outputs, 0);
 		} else if (model_type == "neural_network_regressor") {
 			logger.log(INFO, "Neural network is not currently implemented but will be coming soon :).");
 		} else {
@@ -56,10 +58,6 @@ int main(int argc, char *argv[])
 
 	}
 
-    // Example usage of the logger
-    logger.log(INFO, "Program started.");
-    logger.log(DEBUG, "Debugging information.");
-    logger.log(ERROR, "An error occurred.");
 
     return 0;
 }
