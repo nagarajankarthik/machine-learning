@@ -18,11 +18,11 @@ namespace ml{
 		tree.clear();
 	}
 
-	vector<unordered_map<int, int>> get_classes_frequencies(const vector<int> & indices, const vector<vector<int>> & outputs) {
+	vector<unordered_map<int, int>> DecisionTreeClassifier::get_classes_frequencies(const vector<int> & indices, const vector<vector<int>> & outputs) {
 
 		int number_output_variables = outputs[0].size();
 
-		vector<unordered_map<int, int>> classes_frequencies (number_output_variables, {});
+		vector<unordered_map<int, int>> classes_frequencies {}; 
 		for (int i = 0; i < number_output_variables; i++) {
 			unordered_map<int, int> current_frequencies {};
 			for (int index:indices) {
@@ -146,18 +146,7 @@ namespace ml{
 	void DecisionTreeClassifier::fit(const vector<vector<double>> & features, const vector<vector<int>> & outputs) {
 
 		tree.clear();
-
-		// TODO: Move data checks to a separate file.
 		int number_instances = features.size();
-		if (number_instances < 1) {
-			logger->log(ERROR, "Training data must have at least one instance.");
-			return;
-		}
-
-		if (number_instances != outputs.size()) {
-			logger->log(ERROR, "Datasets for features and outputs must have identical numbers of instances." "Features dataset has " + std::to_string(number_instances) + " instances but outputs dataset has " + std::to_string(outputs.size()) + " instances.");
-			return;
-		}
 
 
 		int number_features = features[0].size();
@@ -173,7 +162,7 @@ namespace ml{
 		while (!node_queue.empty()) {
 			shared_ptr<TreeNode> current_node = node_queue.front() ;
 			node_queue.pop_front();
-			pair<shared_ptr<TreeNode>, shared_ptr<TreeNode>> children = split_node(current_node);
+			pair<shared_ptr<TreeNode>, shared_ptr<TreeNode>> children = split_node(current_node, features, outputs);
 			shared_ptr<TreeNode> left_child = children.first;
 			shared_ptr<TreeNode> right_child = children.second;
 			if (left_child != nullptr) {
@@ -185,16 +174,23 @@ namespace ml{
 
 		double feature_importances_sum = accumulate(feature_importances.begin(), feature_importances.end(), 0.);
 		for (double value:feature_importances) value /= feature_importances_sum;
+		report_fit_results();
 
+
+	}
+
+	/**
+	 * Log characteristics of decision tree
+	 */
+	void DecisionTreeClassifier::report_fit_results() {
 		logger->log(INFO, "Decision tree characteristics");
 		logger->log(INFO, "Total number of nodes = " + to_string(tree.size()));
 		logger->log(INFO, "Number of splits = " + to_string(number_splits));
 		logger->log(INFO, "Number of leaf nodes = " + to_string(number_leaf_nodes));
 		logger->log(INFO, "Maximum node depth = " + to_string(max_depth));
 		logger->log(INFO, "Feature Importances");
-		for (int i = 0; i < number_features; i++) 
+		for (int i = 0; i < feature_importances.size(); i++) 
 			logger->log(INFO, "Feature " + to_string(i) + " importance = "+ to_string(feature_importances[i]));
-
 
 	}
 }
