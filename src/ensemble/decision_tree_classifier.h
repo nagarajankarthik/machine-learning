@@ -4,6 +4,9 @@
 
 #include <string>
 #include <vector>
+#include <list>
+#include <unordered_set>
+#include <memory>
 #include "../utils/json.hpp"
 #include "../utils/logging.cpp"
 
@@ -15,13 +18,14 @@ namespace ml
 	 * Class defining attributes of each node in a decision tree.
 	 */
 	struct TreeNode {
-		TreeNode * left_child = nullptr;
-		TreeNode * right_child = nullptr;
+		shared_ptr<TreeNode> left_child  ;
+		shared_ptr<TreeNode> right_child ;
 		int feature_split = -1;
 		double value_split = std::numeric_limits<double>::min();
 		vector<int> node_indices {};
 	        int depth = -1;
-		TreeNode(vector<int> _indices, int _depth): node_indices(_indices), depth(_depth) {};
+		double impurity = -1;
+		TreeNode(vector<int> node_indices, int depth): node_indices(node_indices), depth(depth) {};
 	};	       
 
 	/**
@@ -41,15 +45,43 @@ namespace ml
 		 */
 		string impurity_method = "gini";
 
+
+		/**
+		 * Number of leaf nodes
+		 */
+		int number_leaf_nodes = 0;
+
+		/**
+		 * Number of splits
+		 */
+		int number_splits = 0;
+
+		/** 
+		 * Maximum depth of all nodes
+		 */
+		int max_depth = 0;
+
+		/**
+		 * Feature Importances
+		 */
+		vector<double> feature_importances {};
+
+		/**
+		 * Pointer to tree root
+		 */
+
+		shared_ptr<TreeNode> root ;
+
+
 		/**
 		 * Container of TreeNodes.
 		 */
-		vector<TreeNode*> _tree {};
+		vector<shared_ptr<TreeNode>> tree {};
 
 		/**
 		 * Constructor
 		 */
-		DecisionTreeClassifier(nlohmann::json model_parameters, Logger * _logger);
+		DecisionTreeClassifier(nlohmann::json model_parameters, Logger * logger);
 
 		/**
 		 * Destructor
