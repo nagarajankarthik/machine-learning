@@ -89,9 +89,29 @@ namespace ml
 		~DecisionTreeClassifier() ;
 
 		/**
+		 * Compile number of occurrences of each unique class for each output variable.
+		 */
+		vector<unordered_map<int, int>> get_classes_frequencies(const vector<int> & indices, const vector<vector<int>> & outputs) ;
+
+		/**
+		 * Calculate node impurity using gini or entropy methods.
+		 */
+		double get_impurity(const vector<int> & indices, const vector<vector<int>> & outputs) ;
+
+		/**
+		 * Determine best feature and value for splitting a node.
+		 */
+		pair<shared_ptr<TreeNode>, shared_ptr<TreeNode>> split_node(shared_ptr<TreeNode> node, const vector<vector<double>> & features, const vector<vector<int>> & outputs) ;
+
+		/**
 		 * Train a decision tree using the recursive partitioning algorithm.
 		 */
 		void fit(const vector<vector<double>> & features, const vector<vector<int>> & outputs);
+
+		/**
+		 * Log characteristics of decision tree after training.
+		 */
+		void report_fit_results();
 
 
 
