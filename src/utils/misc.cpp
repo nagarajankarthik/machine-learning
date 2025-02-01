@@ -23,6 +23,12 @@ void train_test_split(const vector<vector<double>> & features, const vector<vect
 	int number_train = round(train_ratio*total_instances);
 	int number_test = total_instances - number_train ;
 
+	if (number_train < 1) {
+		logger->log(ERROR, "Training data must have at least one instance.");
+		exit(EXIT_FAILURE);
+	}
+
+
 	unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
 	vector<int> data_indices {};
 	for (int i = 0; i < total_instances; i++) data_indices.push_back(i);
