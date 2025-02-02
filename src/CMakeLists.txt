@@ -12,7 +12,7 @@ target_sources(ml PRIVATE "main.cpp")
 target_include_directories(ml PRIVATE "${PROJECT_SOURCE_DIR}")
 # add subdirectories
 add_subdirectory(utils)
+add_subdirectory(ensemble)
 
 # add executables
-
 install(TARGETS ml DESTINATION bin)
