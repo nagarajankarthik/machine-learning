@@ -203,7 +203,7 @@ namespace ml{
 
 
 
-	inline void DecisionTreeClassifier::fit(const vector<vector<double>> & features, const vector<vector<int>> & outputs) {
+	void DecisionTreeClassifier::fit(const vector<vector<double>> & features, const vector<vector<int>> & outputs) {
 
 
 		root = nullptr;
