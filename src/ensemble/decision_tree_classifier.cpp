@@ -22,9 +22,6 @@ namespace ml{
 		}
 	}
 
-	DecisionTreeClassifier::~DecisionTreeClassifier() {
-		tree.clear();
-	}
 
 	vector<unordered_map<int, int>> DecisionTreeClassifier::get_classes_frequencies(const vector<int> & indices, const vector<vector<int>> & outputs) {
 
@@ -92,7 +89,7 @@ namespace ml{
 
 		double max_impurity_reduction = 0.;
 		
-		pair<shared_ptr<TreeNode>, shared_ptr<TreeNode>> children {};
+		pair<shared_ptr<TreeNode>, shared_ptr<TreeNode>> children {nullptr, nullptr};
 
 		// loop over features
 		for (int i = 0; i < features[0].size(); i++) {
@@ -137,6 +134,7 @@ namespace ml{
 			node->right_child = right_child;
 			children.first = left_child;
 			children.second = right_child;
+			total_nodes += 2;
 			max_depth = max(max_depth, 1 + node->depth);
 			number_splits++;
 			feature_importances[best_feature_split] += (1.0*indices.size()/features.size())*max_impurity_reduction;
@@ -148,10 +146,7 @@ namespace ml{
 
 	void DecisionTreeClassifier::breadth_first_search(const vector<vector<double>> & features, const vector<vector<int>> & outputs) {
 
-		tree.clear();
 		int number_instances = features.size();
-
-
 		int number_features = features[0].size();
 		feature_importances.resize(number_features);
 		fill(feature_importances.begin(), feature_importances.end(), 0.);
@@ -160,6 +155,7 @@ namespace ml{
 		root = make_shared<TreeNode>(TreeNode(all_indices, 0));
 		list<shared_ptr<TreeNode>> node_queue {};
 		node_queue.push_back(root);
+		total_nodes++;
 
 		while (!node_queue.empty()) {
 			shared_ptr<TreeNode> current_node = node_queue.front() ;
@@ -171,27 +167,104 @@ namespace ml{
 				node_queue.push_back(left_child);
 				node_queue.push_back(right_child);
 			}
-			tree.push_back(current_node);
 		}
 
 		double feature_importances_sum = accumulate(feature_importances.begin(), feature_importances.end(), 0.);
 		for (double value:feature_importances) value /= feature_importances_sum;
-		report_fit_results();
 
+	}
+
+	void DecisionTreeClassifier::dfs_recurse(shared_ptr<TreeNode> node, const vector<vector<double>> & features, const vector<vector<int>> & outputs) {
+		pair<shared_ptr<TreeNode>, shared_ptr<TreeNode>> children = split_node(node, features, outputs);
+		shared_ptr<TreeNode> left_child = children.first;
+		shared_ptr<TreeNode> right_child = children.second;
+		if (left_child != nullptr) {
+			dfs_recurse(left_child, features, outputs);
+			dfs_recurse(right_child, features, outputs);
+		}
+
+	}
+
+
+	void DecisionTreeClassifier::depth_first_search(const vector<vector<double>> & features, const vector<vector<int>> & outputs) {
+		int number_instances = features.size();
+		int number_features = features[0].size();
+		feature_importances.resize(number_features);
+		fill(feature_importances.begin(), feature_importances.end(), 0.);
+		vector<int> all_indices(number_instances, 0);
+		for (int i = 0; i < all_indices.size(); i++) all_indices[i] = i;
+		root = make_shared<TreeNode>(TreeNode(all_indices, 0));
+		dfs_recurse(root, features, outputs);
+
+		double feature_importances_sum = accumulate(feature_importances.begin(), feature_importances.end(), 0.);
+		for (double value:feature_importances) value /= feature_importances_sum;
 
 	}
 
 
 
-	void DecisionTreeClassifier::fit(const vector<vector<double>> & features, const vector<vector<int>> & outputs) {
+	inline void DecisionTreeClassifier::fit(const vector<vector<double>> & features, const vector<vector<int>> & outputs) {
 
+
+		root = nullptr;
 		if (impurity_method == "breadth") this->breadth_first_search(features, outputs);
 		else this -> depth_first_search(features, outputs);
+		report_fit_results();
 	}
+
+
+	vector<vector<int>> DecisionTreeClassifier::predict(const vector<vector<int>> & train_outputs, const vector<vector<double>> & test_features) { 
+		if (this->root == nullptr) {
+			logger->log(ERROR, "Decision tree must be grown by calling fit method before performing inference.");
+			return {};
+		}
+
+		int number_test_instances = test_features.size();
+
+		vector<int> tmp {};
+
+		vector<vector<int>> predictions(number_test_instances, tmp);
+
+		int number_outputs = train_outputs[0].size();
+
+		for (int j = 0; j < number_test_instances; j++) {
+			vector<double> instance_features = test_features[j];
+			vector<int> instance_predictions {};
+			shared_ptr<TreeNode> current_node(root);
+			while (current_node -> left_child) {
+				int split_feature = current_node->feature_split;
+				double split_value = current_node->value_split;
+				double instance_value = instance_features[split_feature];
+				if (instance_value <= split_value) current_node = current_node->left_child;
+				else current_node = current_node->right_child;
+			}
+			int current_leaf_size = current_node->node_indices.size();
+			vector<unordered_map<int, int>> classes_frequencies = get_classes_frequencies(current_node-> node_indices, train_outputs);
+			vector<int> current_predictions (number_outputs,0);
+			for (int i = 0; i < number_outputs; i++) {
+				unordered_map<int, int> current_frequencies = classes_frequencies[i];
+				int predicted_class = 0;
+				double max_probability = 0.;
+				for (unordered_map<int, int>::iterator it = current_frequencies.begin(); it != current_frequencies.end(); it++) {
+					double class_probability = 1.0*(it->second)/current_leaf_size;
+					if (class_probability > max_probability) {
+						max_probability = class_probability;
+						predicted_class = it->first;
+					}
+				}
+				current_predictions[i] = predicted_class;
+			}
+			predictions[j] = current_predictions;
+		}
+		return predictions;
+	}
+
+
+
 
 	void DecisionTreeClassifier::report_fit_results() {
 		logger->log(INFO, "Decision tree characteristics");
-		logger->log(INFO, "Total number of nodes = " + to_string(tree.size()));
+		logger->log(INFO, "Total number of nodes = " + to_string(total_nodes));
 		logger->log(INFO, "Number of splits = " + to_string(number_splits));
 		logger->log(INFO, "Number of leaf nodes = " + to_string(number_leaf_nodes));
 		logger->log(INFO, "Maximum node depth = " + to_string(max_depth));
