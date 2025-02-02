@@ -5,9 +5,10 @@
 	},
 	"models": [
 		{
-			"model": "random_forest",
+			"model": "decision_tree_classifier",
 			"data": "/mnt/c/Users/65915/example_datasets/iris_processed.csv",
-			"number_trees": 150
+			"search_algorithm": "breadth",
+			"impurity_method": "gini"
 		},
 		{
 			"model": "neural_network",
