@@ -1,8 +1,11 @@
 #include "utils/read_input.cpp"
 #include "utils/misc.cpp"
+#include "utils/evaluate.cpp"
 #include "ensemble/decision_tree_classifier.h"
 #include "ensemble/random_forest_classifier.h"
+
 #include <string>
+
 
 using namespace std;
 using namespace ml;
@@ -20,6 +23,7 @@ int main(int argc, char *argv[])
 
     // Create logger instance
     Logger logger("../logs/" + logFileName);
+    shared_ptr<Logger> logger_ptr = make_shared<Logger>(&logger);
 
     nlohmann::json modelSpecifications = inputParameters["models"];
 
@@ -39,7 +43,7 @@ int main(int argc, char *argv[])
 		if (model_parameters.contains("shuffle_data")) shuffle_data = model_parameters["shuffle_data"];
 		if (model_parameters.contains("train_ratio")) train_ratio = model_parameters["train_ratio"];
 		// train-test split
-		train_test_split(features, outputs, train_features, train_outputs, test_features, test_outputs, train_ratio, shuffle_data, &logger);
+		train_test_split(features, outputs, train_features, train_outputs, test_features, test_outputs, train_ratio, shuffle_data, logger_ptr);
 		// type conversion of outputs for classification algorithms	
 		vector<vector<int>> train_outputs_int = double_to_int(train_outputs) ;
 		vector<vector<int>> test_outputs_int = double_to_int(test_outputs) ;
@@ -48,8 +52,14 @@ int main(int argc, char *argv[])
 			DecisionTreeClassifier decision_tree(model_parameters, &logger);
 			logger.log(INFO, "Training " + model_type);
 			decision_tree.fit(train_features, train_outputs_int);
-			vector<vector<int>> predictions = decision_tree.predict(test_features);
-			vector<vector<int>> confusion_matrix = get_confusion_matrix(predictions, test_outputs, 0);
+			vector<vector<int>> predictions = decision_tree.predict(train_outputs_int, test_features);
+			vector<unordered_set<int>> unique_classes = get_unique_classes(train_outputs_int);
+			vector<unordered_set<int>> unique_classes_test = get_unique_classes(test_outputs_int);
+			for (int i = 0; i < unique_classes.size(); i++) unique_classes[i].insert(unique_classes_test[i].begin(), unique_classes_test[i].end());
+			vector<vector<int>> confusion_matrix = get_confusion_matrix(predictions, test_outputs_int, unique_classes[0], 0);
+			logger.log(INFO, "Confusion matrix for decision tree classifier");
+			logger.log(INFO,"Data file used was " + data_path);
+			logger.log(INFO, array_2d_to_string(confusion_matrix));
 		} else if (model_type == "neural_network_regressor") {
 			logger.log(INFO, "Neural network is not currently implemented but will be coming soon :).");
 		} else {
