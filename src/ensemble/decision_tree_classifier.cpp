@@ -10,8 +10,16 @@ using namespace std;
 namespace ml{
 	DecisionTreeClassifier::DecisionTreeClassifier(nlohmann::json parameters, Logger* logger): logger(logger) {
 
-		// Override values of parameters specified in input.
-		if (parameters.contains("impurity_method")) impurity_method = parameters["impurity_method"] ;
+		if (parameters.contains("impurity_method")) {
+		       string impurity_method_input = parameters["impurity_method"] ;
+		       if (impurity_method_input != "gini" && impurity_method_input != "entropy") logger ->log(WARNING, "The specified method of calculating node impurity, " + impurity_method_input + " is currently unsupported. The default gini method will be used instead.");
+		       else impurity_method = impurity_method_input;
+		}
+
+		if (parameters.contains("search_algorithm")) { 
+			string search_algorithm_input = parameters["search_algorithm"] ;
+			if (search_algorithm_input != "breadth" && search_algorithm_input != "depth") logger->log(WARNING, "The specified method of growing the tree, " + search_algorithm_input + " is currently unsupported. The default breadth first search method will be used instead.");
+		}
 	}
 
 	DecisionTreeClassifier::~DecisionTreeClassifier() {
@@ -138,7 +146,7 @@ namespace ml{
 
 	}
 
-	void DecisionTreeClassifier::fit(const vector<vector<double>> & features, const vector<vector<int>> & outputs) {
+	void DecisionTreeClassifier::breadth_first_search(const vector<vector<double>> & features, const vector<vector<int>> & outputs) {
 
 		tree.clear();
 		int number_instances = features.size();
@@ -153,7 +161,6 @@ namespace ml{
 		list<shared_ptr<TreeNode>> node_queue {};
 		node_queue.push_back(root);
 
-		// breadth-first search
 		while (!node_queue.empty()) {
 			shared_ptr<TreeNode> current_node = node_queue.front() ;
 			node_queue.pop_front();
@@ -172,6 +179,14 @@ namespace ml{
 		report_fit_results();
 
 
+	}
+
+
+
+	void DecisionTreeClassifier::fit(const vector<vector<double>> & features, const vector<vector<int>> & outputs) {
+
+		if (impurity_method == "breadth") this->breadth_first_search(features, outputs);
+		else this -> depth_first_search(features, outputs);
 	}
 
 	void DecisionTreeClassifier::report_fit_results() {
