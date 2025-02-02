@@ -45,6 +45,18 @@ namespace ml
 		 */
 		string impurity_method = "gini";
 
+		/**
+		 * Algorithm to grow decision tree. 
+		 * Allowed values are "breadth" or "depth".
+		 * They correspond to breadth-first and depth-first searches 
+		 * respectively.
+		 */
+		string search_algorithm = "breadth" ;
+
+		/**
+		 * Total number of nodes.
+		 */
+		int total_nodes = 0;
 
 		/**
 		 * Number of leaf nodes
@@ -74,11 +86,6 @@ namespace ml
 
 
 		/**
-		 * Container of TreeNodes.
-		 */
-		vector<shared_ptr<TreeNode>> tree {};
-
-		/**
 		 * Constructor
 		 */
 		DecisionTreeClassifier(nlohmann::json model_parameters, Logger * logger);
@@ -86,7 +93,7 @@ namespace ml
 		/**
 		 * Destructor
 		 */
-		~DecisionTreeClassifier() ;
+		~DecisionTreeClassifier() {};
 
 		/**
 		 * Compile number of occurrences of each unique class for each output variable.
@@ -106,10 +113,32 @@ namespace ml
 		 */
 		pair<shared_ptr<TreeNode>, shared_ptr<TreeNode>> split_node(shared_ptr<TreeNode> node, const vector<vector<double>> & features, const vector<vector<int>> & outputs) ;
 
+
 		/**
-		 * Train a decision tree using the recursive partitioning algorithm.
+		 * Grow decision tree using breadth first search.
 		 */
-		void fit(const vector<vector<double>> & features, const vector<vector<int>> & outputs);
+		void breadth_first_search(const vector<vector<double>> & features, const vector<vector<int>> & outputs);
+
+		/**
+		 * Perform recursive depth first search.
+		 */
+		void dfs_recurse(shared_ptr<TreeNode> node, const vector<vector<double>> & features, const vector<vector<int>> & outputs) ;
+
+
+		/**
+		 * Grow decision tree using depth first search.
+		 */
+		void depth_first_search(const vector<vector<double>> & features, const vector<vector<int>> & outputs);
+
+		/**
+		 * Grow a decision tree using the recursive partitioning algorithm.
+		 * Calls either depth_first_search or breadth_first_search.
+		 */
+		inline void fit(const vector<vector<double>> & features, const vector<vector<int>> & outputs);
+		/**
+		 * Perform inference using decision tree grown by call to fit method.
+		 */
+		vector<vector<int>> predict(const vector<vector<int>> & train_outputs, const vector<vector<double>> & test_features);
 
 		/**
 		 * Log characteristics of decision tree after training.
