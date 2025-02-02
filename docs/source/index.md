@@ -14,4 +14,5 @@ overview
 :caption: API Reference
 decision_tree
 random_forest
+utilities
 ```
