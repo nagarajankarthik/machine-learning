@@ -6,31 +6,15 @@
 
 using namespace std;
 
-namespace ml {
-	
-	class RandomForestClassifier {
-		public:
+namespace ml
+{
 
-			// Data for features
-			vector<vector<double>> features {};
+	class RandomForestClassifier
+	{
+	public:
+		// Number of trees
+		int numberTrees;
 
-			// Data for outputs
-			vector<vector<double>> outputs {};
-
-
-			// Number of trees 
-			int numberTrees;
-
-			void setParameters(nlohmann::json parameters);
-
-			void fit();
-
-			void predict_proba();
-
-
-
-
-			void RunSingle();
+		void fit();
 	};
 }
-
