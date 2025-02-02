@@ -134,7 +134,7 @@ namespace ml
 		 * Grow a decision tree using the recursive partitioning algorithm.
 		 * Calls either depth_first_search or breadth_first_search.
 		 */
-		inline void fit(const vector<vector<double>> & features, const vector<vector<int>> & outputs);
+		void fit(const vector<vector<double>> & features, const vector<vector<int>> & outputs);
 		/**
 		 * Perform inference using decision tree grown by call to fit method.
 		 */
