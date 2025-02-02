@@ -8,7 +8,7 @@
 #include <unordered_set>
 #include <memory>
 #include "../utils/json.hpp"
-#include "../utils/logging.cpp"
+#include "../utils/logging.h"
 
 using namespace std;
 
@@ -37,7 +37,7 @@ namespace ml
 		/**
 		 * Pointer to an instance of Logger.
 		 */
-		Logger * logger ;
+		shared_ptr<Logger> logger ;
 
 		/**
 		 * Criterion to quantify individual node impurities.
@@ -88,7 +88,7 @@ namespace ml
 		/**
 		 * Constructor
 		 */
-		DecisionTreeClassifier(nlohmann::json model_parameters, Logger * logger);
+		DecisionTreeClassifier(nlohmann::json model_parameters, shared_ptr<Logger> logger);
 
 		/**
 		 * Destructor

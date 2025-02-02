@@ -8,7 +8,7 @@
 using namespace std;
 
 namespace ml{
-	DecisionTreeClassifier::DecisionTreeClassifier(nlohmann::json parameters, Logger* logger): logger(logger) {
+	DecisionTreeClassifier::DecisionTreeClassifier(nlohmann::json parameters, shared_ptr<Logger> logger): logger(logger) {
 
 		if (parameters.contains("impurity_method")) {
 		       string impurity_method_input = parameters["impurity_method"] ;
