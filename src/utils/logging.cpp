@@ -1,18 +1,12 @@
-// C++ program to implement a basic logging system.
-#pragma once
 #include <ctime>
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include "logging.h"
 using namespace std;
 
-// Enum to represent log levels
-enum LogLevel { DEBUG, INFO, WARNING, ERROR, CRITICAL };
 
-class Logger {
-public:
-    // Constructor: Opens the log file in append mode
-    Logger(const string& filename)
+Logger::Logger(const string& filename)
     {
         logFile.open(filename, ios::app);
         if (!logFile.is_open()) {
@@ -20,11 +14,9 @@ public:
         }
     }
 
-    // Destructor: Closes the log file
-    ~Logger() { logFile.close(); }
+Logger::~Logger() { logFile.close(); }
 
-    // Logs a message with a given log level
-    void log(LogLevel level, const string& message)
+    void Logger::log(LogLevel level, const string& message)
     {
         // Get current timestamp
         time_t now = time(0);
@@ -50,11 +42,8 @@ public:
         }
     }
 
-private:
-    ofstream logFile; // File stream for the log file
 
-    // Converts log level to a string for output
-    string levelToString(LogLevel level)
+    string Logger::levelToString(LogLevel level)
     {
         switch (level) {
         case DEBUG:
@@ -71,6 +60,5 @@ private:
             return "UNKNOWN";
         }
     }
-};
 
 
