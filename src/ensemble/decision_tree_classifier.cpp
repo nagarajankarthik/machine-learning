@@ -35,11 +35,6 @@ namespace ml{
 		return classes_frequencies;
 	}
 
-	/**
-	 * Calculate node impurity by evaluating the impurity separately for each output variable and averaging the result.
-	 * This is what scikit-learn implements.
-	 * See https://stackoverflow.com/questions/50715574/how-is-the-impurity-decrease-of-a-split-computed-in-case-we-have-multiple-output
-	 */
 	double DecisionTreeClassifier::get_impurity(const vector<int> & indices, const vector<vector<int>> & outputs) {
 
 		int number_outputs = outputs[0].size();
@@ -179,9 +174,6 @@ namespace ml{
 
 	}
 
-	/**
-	 * Log characteristics of decision tree
-	 */
 	void DecisionTreeClassifier::report_fit_results() {
 		logger->log(INFO, "Decision tree characteristics");
 		logger->log(INFO, "Total number of nodes = " + to_string(tree.size()));
