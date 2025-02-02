@@ -94,7 +94,10 @@ namespace ml
 		vector<unordered_map<int, int>> get_classes_frequencies(const vector<int> & indices, const vector<vector<int>> & outputs) ;
 
 		/**
-		 * Calculate node impurity using gini or entropy methods.
+		 * Calculate node impurity by evaluating the impurity separately for each output variable using the gini or entropy method and averaging the result.
+		 * This is supposedly how scikit-learn implements a decision tree.
+		 * See https://stackoverflow.com/questions/50715574/how-is-the-impurity-decrease-of-a-split-computed-in-case-we-have-multiple-output
+
 		 */
 		double get_impurity(const vector<int> & indices, const vector<vector<int>> & outputs) ;
 
