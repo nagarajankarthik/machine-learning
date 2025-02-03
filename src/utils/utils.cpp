@@ -1,7 +1,11 @@
 #include "utils.h"
+#include <iterator>
 
 namespace ml
 {
+
+
+	Utilities::Utilities(shared_ptr<Logger> logger):logger(logger) {} ;	
 
 	vector<vector<int>> Utilities::get_confusion_matrix(const vector<vector<int>> &predictions, const vector<vector<int>> &test_outputs, unordered_set<int> unique_classes, int index_output)
 	{
@@ -27,7 +31,7 @@ namespace ml
 		return confusion_matrix;
 	}
 
-	void Utilities::train_test_split(const vector<vector<double>> &features, const vector<vector<double>> &outputs, vector<vector<double>> &train_features, vector<vector<double>> &train_outputs, vector<vector<double>> &test_features, vector<vector<double>> &test_outputs, double train_ratio, bool shuffle_data, shared_ptr<Logger> logger)
+	void Utilities::train_test_split(const vector<vector<double>> &features, const vector<vector<double>> &outputs, vector<vector<double>> &train_features, vector<vector<double>> &train_outputs, vector<vector<double>> &test_features, vector<vector<double>> &test_outputs, double train_ratio, bool shuffle_data)
 	{
 
 		if (features.size() != outputs.size())
@@ -56,14 +60,14 @@ namespace ml
 
 		for (int i = 0; i < number_train; i++)
 		{
-			train_features.push_back(features[i]);
-			train_outputs.push_back(outputs[i]);
+			train_features.push_back(features[data_indices[i]]);
+			train_outputs.push_back(outputs[data_indices[i]]);
 		}
 
 		for (int i = 0; i < number_test; i++)
 		{
-			test_features.push_back(features[i + number_train]);
-			test_outputs.push_back(outputs[i + number_train]);
+			test_features.push_back(features[data_indices[i + number_train]]);
+			test_outputs.push_back(outputs[data_indices[i + number_train]]);
 		}
 	}
 
@@ -153,22 +157,26 @@ namespace ml
 		std::string line;
 		getline(inp, line);
 		std::stringstream ss(line);
-		int numberFeatures = 0;
-		int numberOutputs = 0;
-		ss >> numberFeatures >> numberOutputs;
+		int number_features = 0;
+		int number_outputs = 0;
+		ss >> number_features >> number_outputs;
+		logger->log(INFO, "Number of features = " + to_string(number_features));
 
 		while (getline(inp, line))
 		{
 			ss << line;
-			std::vector<double> rowFeatures(numberFeatures, 0.);
-			std::vector<double> rowOutputs(numberOutputs, 0.);
-			for (int i = 0; i < numberFeatures; i++)
+			std::vector<double> rowFeatures(number_features, 0.);
+			std::vector<double> rowOutputs(number_outputs, 0.);
+			for (int i = 0; i < number_features; i++)
 				ss >> rowFeatures[i];
-			for (int i = 0; i < numberOutputs; i++)
+			for (int i = 0; i < number_outputs; i++)
 				ss >> rowOutputs[i];
 			features.push_back(rowFeatures);
 			outputs.push_back(rowOutputs);
 		}
+
+		logger->log(INFO, "Number of instances = " +to_string(features.size()));
 	}
+
 
 } // namespace ml
