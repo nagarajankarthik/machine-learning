@@ -205,6 +205,7 @@ namespace ml{
 		logger->log(DEBUG, "Number of training instances = " + to_string(features.size()));
 
 		logger->log(DEBUG, "Number of features = " + to_string(features[0].size()));
+		logger->log(DEBUG, "Number of outputs = " + to_string(outputs[0].size()));
 		int number_features = features[0].size();
 		feature_importances.resize(number_features);
 		fill(feature_importances.begin(), feature_importances.end(), 0.);
