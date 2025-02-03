@@ -147,9 +147,6 @@ namespace ml{
 	void DecisionTreeClassifier::breadth_first_search(const vector<vector<double>> & features, const vector<vector<int>> & outputs) {
 
 		int number_instances = features.size();
-		int number_features = features[0].size();
-		feature_importances.resize(number_features);
-		fill(feature_importances.begin(), feature_importances.end(), 0.);
 		vector<int> all_indices(number_instances, 0);
 		for (int i = 0; i < all_indices.size(); i++) all_indices[i] = i;
 		root = make_shared<TreeNode>(TreeNode(all_indices, 0));
@@ -188,9 +185,6 @@ namespace ml{
 
 	void DecisionTreeClassifier::depth_first_search(const vector<vector<double>> & features, const vector<vector<int>> & outputs) {
 		int number_instances = features.size();
-		int number_features = features[0].size();
-		feature_importances.resize(number_features);
-		fill(feature_importances.begin(), feature_importances.end(), 0.);
 		vector<int> all_indices(number_instances, 0);
 		for (int i = 0; i < all_indices.size(); i++) all_indices[i] = i;
 		root = make_shared<TreeNode>(TreeNode(all_indices, 0));
@@ -207,6 +201,13 @@ namespace ml{
 
 
 		root = nullptr;
+
+		logger->log(DEBUG, "Number of training instances = " + to_string(features.size()));
+
+		logger->log(DEBUG, "Number of features = " + to_string(features[0].size()));
+		int number_features = features[0].size();
+		feature_importances.resize(number_features);
+		fill(feature_importances.begin(), feature_importances.end(), 0.);
 		if (impurity_method == "breadth") this->breadth_first_search(features, outputs);
 		else this -> depth_first_search(features, outputs);
 		report_fit_results();
