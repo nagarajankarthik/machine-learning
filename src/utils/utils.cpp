@@ -148,27 +148,34 @@ namespace ml
 		return inputParameters;
 	}
 
-	void Utilities::read_data(std::string dataFileName,
+	void Utilities::read_data(std::string data_file,
 							  std::vector<std::vector<double>> &features,
-							  std::vector<std::vector<double>> &outputs)
+							  std::vector<std::vector<double>> &outputs, char delimiter)
 	{
 		std::ifstream inp;
-		inp.open(dataFileName);
+		inp.open(data_file);
 		std::string line;
-		getline(inp, line);
+		getline(inp, line, delimiter);
+		cout << line << endl;
 		std::stringstream ss(line);
 		int number_features = 0;
 		int number_outputs = 0;
-		ss >> number_features >> number_outputs;
+		ss >> number_features;
+	        ss >> number_outputs;	
 		logger->log(INFO, "Number of features = " + to_string(number_features));
 
-		while (getline(inp, line))
+
+		logger->log(INFO, "Number of outputs = " + to_string(number_outputs));
+
+		while (getline(inp, line, delimiter))
 		{
+			//cout << line << endl;
 			ss << line;
 			std::vector<double> row_features(number_features, 0.);
 			std::vector<double> row_outputs(number_outputs, 0.);
-			for (int i = 0; i < number_features; i++)
+			for (int i = 0; i < number_features; i++) {
 				ss >> row_features[i];
+			}
 			for (int i = 0; i < number_outputs; i++)
 				ss >> row_outputs[i];
 			features.push_back(row_features);
