@@ -20,6 +20,8 @@ int main(int argc, char *argv[])
     // Create logger instance
     shared_ptr<Logger> logger = make_shared<Logger>("../logs/" + log_file);
 
+    utils.logger = logger;
+
     nlohmann::json model_specifications = input_parameters["models"];
 
 	for (nlohmann::json::iterator it = model_specifications.begin(); it != model_specifications.end(); ++it) {
@@ -37,7 +39,7 @@ int main(int argc, char *argv[])
 		if (model_parameters.contains("shuffle_data")) shuffle_data = model_parameters["shuffle_data"];
 		if (model_parameters.contains("train_ratio")) train_ratio = model_parameters["train_ratio"];
 		// train-test split
-		utils.train_test_split(features, outputs, train_features, train_outputs, test_features, test_outputs, train_ratio, shuffle_data, logger);
+		utils.train_test_split(features, outputs, train_features, train_outputs, test_features, test_outputs, train_ratio, shuffle_data);
 		// type conversion of outputs for classification algorithms	
 		vector<vector<int>> train_outputs_int = utils.double_to_int(train_outputs) ;
 		vector<vector<int>> test_outputs_int = utils.double_to_int(test_outputs) ;
