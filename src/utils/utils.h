@@ -73,8 +73,8 @@ namespace ml
 		 * @param features: Array to store data for features.
 		 * @param outputs: Array to store data for outputs.
 		 */
-		void read_data(std::string dataFileName,
+		void read_data(std::string data_file,
 					   std::vector<std::vector<double>> &features,
-					   std::vector<std::vector<double>> &outputs);
+					   std::vector<std::vector<double>> &outputs, char delimiter = ',');
 	};
 } // namespace ml
