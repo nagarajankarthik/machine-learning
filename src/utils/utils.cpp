@@ -165,14 +165,14 @@ namespace ml
 		while (getline(inp, line))
 		{
 			ss << line;
-			std::vector<double> rowFeatures(number_features, 0.);
-			std::vector<double> rowOutputs(number_outputs, 0.);
+			std::vector<double> row_features(number_features, 0.);
+			std::vector<double> row_outputs(number_outputs, 0.);
 			for (int i = 0; i < number_features; i++)
-				ss >> rowFeatures[i];
+				ss >> row_features[i];
 			for (int i = 0; i < number_outputs; i++)
-				ss >> rowOutputs[i];
-			features.push_back(rowFeatures);
-			outputs.push_back(rowOutputs);
+				ss >> row_outputs[i];
+			features.push_back(row_features);
+			outputs.push_back(row_outputs);
 		}
 
 		logger->log(INFO, "Number of instances = " +to_string(features.size()));
