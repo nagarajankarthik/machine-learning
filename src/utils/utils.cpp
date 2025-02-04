@@ -154,30 +154,33 @@ namespace ml
 	{
 		std::ifstream inp;
 		inp.open(data_file);
-		std::string line;
-		getline(inp, line, delimiter);
+		std::string line, value;
+		getline(inp, line);
 		cout << line << endl;
 		std::stringstream ss(line);
 		int number_features = 0;
 		int number_outputs = 0;
-		ss >> number_features;
-	        ss >> number_outputs;	
+		getline(ss, value, delimiter);
+		number_features = std::stoi(value);
+		getline(ss, value, delimiter);
+		number_outputs = std::stoi(value);
+		
 		logger->log(INFO, "Number of features = " + to_string(number_features));
-
-
 		logger->log(INFO, "Number of outputs = " + to_string(number_outputs));
 
-		while (getline(inp, line, delimiter))
+		while (getline(inp, line))
 		{
-			//cout << line << endl;
 			ss << line;
 			std::vector<double> row_features(number_features, 0.);
 			std::vector<double> row_outputs(number_outputs, 0.);
 			for (int i = 0; i < number_features; i++) {
-				ss >> row_features[i];
+				getline(ss, value, delimiter);
+				row_features[i] = std::stod(value);
 			}
-			for (int i = 0; i < number_outputs; i++)
-				ss >> row_outputs[i];
+			for (int i = 0; i < number_outputs; i++) {
+				getline(ss, value, delimiter);
+				row_outputs[i] = std::stod(value);
+			}
 			features.push_back(row_features);
 			outputs.push_back(row_outputs);
 		}
