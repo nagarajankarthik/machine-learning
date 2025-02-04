@@ -170,17 +170,23 @@ namespace ml
 
 		while (getline(inp, line))
 		{
-			ss << line;
+			//cout << line << endl;
+			std::stringstream ssd(line);
+			std::string value_data;
 			std::vector<double> row_features(number_features, 0.);
 			std::vector<double> row_outputs(number_outputs, 0.);
 			for (int i = 0; i < number_features; i++) {
-				getline(ss, value, delimiter);
-				row_features[i] = std::stod(value);
+				getline(ssd, value_data, delimiter);
+				row_features[i] = std::stod(value_data);
+				cout << value_data << ", ";
 			}
 			for (int i = 0; i < number_outputs; i++) {
-				getline(ss, value, delimiter);
-				row_outputs[i] = std::stod(value);
+				getline(ssd, value_data, delimiter);
+				row_outputs[i] = std::stod(value_data);
+				cout << value_data << ", ";
 			}
+
+			cout << endl;
 			features.push_back(row_features);
 			outputs.push_back(row_outputs);
 		}
