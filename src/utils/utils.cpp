@@ -156,7 +156,6 @@ namespace ml
 		inp.open(data_file);
 		std::string line, value;
 		getline(inp, line);
-		cout << line << endl;
 		std::stringstream ss(line);
 		int number_features = 0;
 		int number_outputs = 0;
@@ -170,26 +169,23 @@ namespace ml
 
 		while (getline(inp, line))
 		{
-			//cout << line << endl;
 			std::stringstream ssd(line);
-			std::string value_data;
-			std::vector<double> row_features(number_features, 0.);
-			std::vector<double> row_outputs(number_outputs, 0.);
+			std::vector<double> row_features(number_features, 0.0);
+			std::vector<double> row_outputs(number_outputs, 0.0);
 			for (int i = 0; i < number_features; i++) {
-				getline(ssd, value_data, delimiter);
-				row_features[i] = std::stod(value_data);
-				cout << value_data << ", ";
+				getline(ssd, value, delimiter);
+				row_features[i] = std::stod(value);
 			}
 			for (int i = 0; i < number_outputs; i++) {
-				getline(ssd, value_data, delimiter);
-				row_outputs[i] = std::stod(value_data);
-				cout << value_data << ", ";
+				getline(ssd, value, delimiter);
+				row_outputs[i] = std::stod(value);
 			}
 
-			cout << endl;
 			features.push_back(row_features);
 			outputs.push_back(row_outputs);
 		}
+
+		inp.close();
 
 		logger->log(INFO, "Number of instances = " +to_string(features.size()));
 	}
