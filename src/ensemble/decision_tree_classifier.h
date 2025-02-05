@@ -7,6 +7,7 @@
 #include <list>
 #include <unordered_set>
 #include <memory>
+#include <random>
 #include "../utils/json.hpp"
 #include "../utils/logging.h"
 
@@ -72,6 +73,18 @@ namespace ml
 		 * Maximum depth of all nodes
 		 */
 		int max_depth = 0;
+
+		/**
+		 * Fraction determining the number of features
+		 * that will be considered during each split.
+		 */
+		double max_feature_fraction = 1.0;
+
+		/**
+		 * Maximum number of features that 
+		 * will be considered during each split.
+		 */
+		int max_features = 0;
 
 		/**
 		 * Feature Importances
