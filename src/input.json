@@ -6,12 +6,13 @@
 	"models": [
 		{
 			"model": "decision_tree_classifier",
-			"data": "/mnt/c/Users/Administrator/example_datasets/iris_processed.csv",
+			"data": "/mnt/c/Users/65915/example_datasets/iris_processed.csv",
 			"search_algorithm": "breadth",
 			"impurity_method": "gini"
 		},
 		{
 			"model": "neural_network",
+			"data": "/mnt/c/Users/65915/example_datasets/iris_processed.csv",
 			"hidden_layer_size": [
 				100,
 				100
