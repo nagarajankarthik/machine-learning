@@ -2,6 +2,7 @@
  * header file for random forest class
  */
 #include "decision_tree_classifier.h"
+#include <random>
 
 using namespace std;
 
@@ -22,6 +23,11 @@ namespace ml
 		 */
 		nlohmann::json parameters ;
 
+		/**
+		 * Random number engine
+		 */
+		std::mt19937 random_generator;
+
 		// Number of trees
 		int number_trees = 20;
 
@@ -41,9 +47,19 @@ namespace ml
 		~RandomForestClassifier() {};
 
 		/**
+		 * Get bootstrap sample
+		 */
+		void get_bootstrap_sample(const vector<vector<double>> & features,const vector<vector<int>> & outputs, vector<vector<double>> & features_sample, vector<vector<int>> & outputs_sample);
+
+		/**
 		 * Perform model training.
 		 */
 		void fit(const vector<vector<double>> & features, const vector<vector<int>> & outputs) ;
+
+		/**
+		 * Perform model inference
+		 */
+		vector<vector<int>> predict(const vector<vector<int>> & train_outputs, const vector<vector<double>> & test_features);
 	};
 	
 }
