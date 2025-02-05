@@ -1,6 +1,7 @@
 #include "decision_tree_classifier.h"
 
 #include <limits>
+#include <random>
 #include <string>
 #include <utility>
 #include <vector>
@@ -18,7 +19,17 @@ namespace ml{
 
 		if (parameters.contains("search_algorithm")) { 
 			string search_algorithm_input = parameters["search_algorithm"] ;
-			if (search_algorithm_input != "breadth" && search_algorithm_input != "depth") logger->log(WARNING, "The specified method of growing the tree, " + search_algorithm_input + " is currently unsupported. The default breadth first search method will be used instead.");
+			if (search_algorithm_input != "breadth" && search_algorithm_input != "depth")  
+				logger->log(WARNING, "The specified method of growing the tree, " + search_algorithm_input + " is currently unsupported. The default breadth first search method will be used instead.");
+			else search_algorithm = "depth";
+		}
+		
+
+		if (parameters.contains("max_feature_fraction")) {
+				double max_feature_fraction_input = parameters["max_feature_fraction"];
+				if (max_feature_fraction_input < 0.2) max_feature_fraction = 0.2;
+				else if (max_feature_fraction > 1.0) max_feature_fraction = 1.0;
+				else max_feature_fraction = max_feature_fraction_input;
 		}
 	}
 
@@ -77,7 +88,8 @@ namespace ml{
 
 
 	pair<shared_ptr<TreeNode>, shared_ptr<TreeNode>> DecisionTreeClassifier::split_node(shared_ptr<TreeNode> node, const vector<vector<double>> & features, const vector<vector<int>> & outputs) {
-		vector<int> indices = node->node_indices;
+
+		vector<int> data_indices = node->node_indices;
 
 		int best_feature_split = -1;
 		double best_value_split = std::numeric_limits<double>::min();
@@ -91,27 +103,33 @@ namespace ml{
 		
 		pair<shared_ptr<TreeNode>, shared_ptr<TreeNode>> children {nullptr, nullptr};
 
-		// loop over features
-		for (int i = 0; i < features[0].size(); i++) {
+		int number_features = features[0].size();
+		vector<int> feature_indices(number_features, 0);
+		for (int i = 0; i < number_features; i++) feature_indices[i] = i;
+		unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
+		std::shuffle(feature_indices.begin(), feature_indices.end(), std::default_random_engine(seed));
+
+		for (int i = 0; i < max_features; i++) {
 			unordered_set<double> unique_values {};
-			for (int index:indices) unique_values.insert(features[index][i]);
+			int feature_index = feature_indices[i];
+			for (int data_index:data_indices) unique_values.insert(features[data_index][feature_index]);
 			vector<int> left_indices {};
 			vector<int> right_indices {};
 			for (double value:unique_values) {
-				for (int index:indices) {
-					double current_value = features[index][i];
-					if (current_value <= value) left_indices.push_back(index);
-					else right_indices.push_back(index);
+				for (int data_index:data_indices) {
+					double current_value = features[data_index][feature_index];
+					if (current_value <= value) left_indices.push_back(data_index);
+					else right_indices.push_back(data_index);
 				}
 
 					// Compare impurities of current node and left and right splits
 				if (left_indices.empty() || right_indices.empty()) continue;
 				double left_impurity = get_impurity(left_indices, outputs);
 				double right_impurity = get_impurity(right_indices, outputs);
-				double average_child_impurity = (1.0*left_indices.size()/indices.size())*left_impurity + (1.0*right_indices.size()/indices.size())*right_impurity ;
+				double average_child_impurity = (1.0*left_indices.size()/data_indices.size())*left_impurity + (1.0*right_indices.size()/data_indices.size())*right_impurity ;
 				double impurity_reduction = parent_impurity - average_child_impurity;
 				if (impurity_reduction > max_impurity_reduction) {
-					best_feature_split = i;
+					best_feature_split = feature_index;
 					best_value_split = value;
 					max_impurity_reduction = impurity_reduction;
 					best_left_indices.assign(left_indices.begin(), left_indices.end());
@@ -137,7 +155,7 @@ namespace ml{
 			total_nodes += 2;
 			max_depth = max(max_depth, 1 + node->depth);
 			number_splits++;
-			feature_importances[best_feature_split] += (1.0*indices.size()/features.size())*max_impurity_reduction;
+			feature_importances[best_feature_split] += (1.0*data_indices.size()/features.size())*max_impurity_reduction;
 		} else number_leaf_nodes++;
 
 		return children;
@@ -146,13 +164,8 @@ namespace ml{
 
 	void DecisionTreeClassifier::breadth_first_search(const vector<vector<double>> & features, const vector<vector<int>> & outputs) {
 
-		int number_instances = features.size();
-		vector<int> all_indices(number_instances, 0);
-		for (int i = 0; i < all_indices.size(); i++) all_indices[i] = i;
-		root = make_shared<TreeNode>(TreeNode(all_indices, 0));
 		list<shared_ptr<TreeNode>> node_queue {};
 		node_queue.push_back(root);
-		total_nodes++;
 
 		while (!node_queue.empty()) {
 			shared_ptr<TreeNode> current_node = node_queue.front() ;
@@ -184,10 +197,6 @@ namespace ml{
 
 
 	void DecisionTreeClassifier::depth_first_search(const vector<vector<double>> & features, const vector<vector<int>> & outputs) {
-		int number_instances = features.size();
-		vector<int> all_indices(number_instances, 0);
-		for (int i = 0; i < all_indices.size(); i++) all_indices[i] = i;
-		root = make_shared<TreeNode>(TreeNode(all_indices, 0));
 		dfs_recurse(root, features, outputs);
 
 		double feature_importances_sum = accumulate(feature_importances.begin(), feature_importances.end(), 0.);
@@ -201,12 +210,21 @@ namespace ml{
 
 
 		root = nullptr;
+		int number_features = features[0].size();
+		max_features = (int) round(max_feature_fraction*number_features);
+
+		int number_instances = features.size();
+		vector<int> all_indices(number_instances, 0);
+		for (int i = 0; i < all_indices.size(); i++) all_indices[i] = i;
+		root = make_shared<TreeNode>(TreeNode(all_indices, 0));
+		root->impurity = get_impurity(all_indices, outputs);
+		total_nodes = 1;
+
 
 		logger->log(DEBUG, "Number of training instances = " + to_string(features.size()));
 
 		logger->log(DEBUG, "Number of features = " + to_string(features[0].size()));
 		logger->log(DEBUG, "Number of outputs = " + to_string(outputs[0].size()));
-		int number_features = features[0].size();
 		feature_importances.resize(number_features);
 		fill(feature_importances.begin(), feature_importances.end(), 0.);
 		if (impurity_method == "breadth") this->breadth_first_search(features, outputs);
