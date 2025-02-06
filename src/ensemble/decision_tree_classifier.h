@@ -42,6 +42,11 @@ namespace ml
 		shared_ptr<Logger> logger ;
 
 		/**
+		 * Random seed
+		 */
+		int random_seed = 0;
+
+		/**
 		 * Criterion to quantify individual node impurities.
 		 * Allowed values are 'gini' and 'entropy'.
 		 */
