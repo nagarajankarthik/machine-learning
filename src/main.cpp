@@ -29,6 +29,7 @@ int main(int argc, char *argv[])
 	for (nlohmann::json::iterator it = model_specifications.begin(); it != model_specifications.end(); ++it) {
 		nlohmann::json model_parameters = *it;
 		string data_path = model_parameters["data"];
+		int random_seed = model_parameters["random_seed"];
 		vector<vector<double>> features {};
 		vector<vector<double>> outputs {};
 		utils.read_data(data_path, features, outputs);
@@ -41,7 +42,7 @@ int main(int argc, char *argv[])
 		if (model_parameters.contains("shuffle_data")) shuffle_data = model_parameters["shuffle_data"];
 		if (model_parameters.contains("train_ratio")) train_ratio = model_parameters["train_ratio"];
 		// train-test split
-		utils.train_test_split(features, outputs, train_features, train_outputs, test_features, test_outputs, train_ratio, shuffle_data);
+		utils.train_test_split(features, outputs, train_features, train_outputs, test_features, test_outputs, train_ratio, shuffle_data, random_seed);
 		// type conversion of outputs for classification algorithms	
 		vector<vector<int>> train_outputs_int = utils.double_to_int(train_outputs) ;
 		vector<vector<int>> test_outputs_int = utils.double_to_int(test_outputs) ;
