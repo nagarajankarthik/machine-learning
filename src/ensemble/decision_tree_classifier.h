@@ -2,6 +2,7 @@
  * Header file for decision tree class
  */
 
+#pragma once
 #include <string>
 #include <vector>
 #include <list>
