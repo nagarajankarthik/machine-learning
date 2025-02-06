@@ -31,7 +31,7 @@ namespace ml
 		return confusion_matrix;
 	}
 
-	void Utilities::train_test_split(const vector<vector<double>> &features, const vector<vector<double>> &outputs, vector<vector<double>> &train_features, vector<vector<double>> &train_outputs, vector<vector<double>> &test_features, vector<vector<double>> &test_outputs, double train_ratio, bool shuffle_data)
+	void Utilities::train_test_split(const vector<vector<double>> &features, const vector<vector<double>> &outputs, vector<vector<double>> &train_features, vector<vector<double>> &train_outputs, vector<vector<double>> &test_features, vector<vector<double>> &test_outputs, double train_ratio, bool shuffle_data, int random_seed)
 	{
 
 		if (features.size() != outputs.size())
@@ -50,13 +50,12 @@ namespace ml
 			exit(EXIT_FAILURE);
 		}
 
-		unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
 		vector<int> data_indices{};
 		for (int i = 0; i < total_instances; i++)
 			data_indices.push_back(i);
 
 		if (shuffle_data)
-			std::shuffle(data_indices.begin(), data_indices.end(), std::default_random_engine(seed));
+			std::shuffle(data_indices.begin(), data_indices.end(), std::default_random_engine(random_seed));
 
 		for (int i = 0; i < number_train; i++)
 		{
