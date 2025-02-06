@@ -37,7 +37,7 @@ namespace ml
 
 		/** Split the input data for features and outputs into training and test sets.
 		 */
-		void train_test_split(const vector<vector<double>> &features, const vector<vector<double>> &outputs, vector<vector<double>> &train_features, vector<vector<double>> &train_outputs, vector<vector<double>> &test_features, vector<vector<double>> &test_outputs, double train_ratio, bool shuffle_data);
+		void train_test_split(const vector<vector<double>> &features, const vector<vector<double>> &outputs, vector<vector<double>> &train_features, vector<vector<double>> &train_outputs, vector<vector<double>> &test_features, vector<vector<double>> &test_outputs, double train_ratio, bool shuffle_data, int random_seed = 0);
 
 		/**
 		 * Convert a 2D array containing elements of type double to a 2D array containing elements of type int.
