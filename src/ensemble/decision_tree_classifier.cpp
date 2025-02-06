@@ -31,6 +31,11 @@ namespace ml{
 				else if (max_feature_fraction > 1.0) max_feature_fraction = 1.0;
 				else max_feature_fraction = max_feature_fraction_input;
 		}
+
+		if (parameters.contains("random_seed")) {
+			int random_seed_input = parameters["random_seed"];
+			if (random_seed_input > -1) random_seed = random_seed_input;
+		}
 	}
 
 
@@ -106,8 +111,7 @@ namespace ml{
 		int number_features = features[0].size();
 		vector<int> feature_indices(number_features, 0);
 		for (int i = 0; i < number_features; i++) feature_indices[i] = i;
-		unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-		std::shuffle(feature_indices.begin(), feature_indices.end(), std::default_random_engine(seed));
+		std::shuffle(feature_indices.begin(), feature_indices.end(), std::default_random_engine(random_seed));
 
 		for (int i = 0; i < max_features; i++) {
 			unordered_set<double> unique_values {};
