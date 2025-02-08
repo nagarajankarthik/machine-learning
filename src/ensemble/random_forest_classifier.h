@@ -37,6 +37,16 @@ namespace ml
 		vector<shared_ptr<DecisionTreeClassifier>> trees {};
 
 		/**
+		 * Features for training data
+		 */
+		vector<vector<double>> train_features {};
+
+		/**
+		 * Labels for training data
+		 */
+		vector<vector<int>> train_labels {} ;
+
+		/**
 		 * Constructor
 		 */
 		RandomForestClassifier(nlohmann::json parameters, shared_ptr<Logger> logger)  ;
@@ -49,17 +59,17 @@ namespace ml
 		/**
 		 * Get bootstrap sample
 		 */
-		void get_bootstrap_sample(const vector<vector<double>> & features,const vector<vector<int>> & outputs, vector<vector<double>> & features_sample, vector<vector<int>> & outputs_sample);
+		void get_bootstrap_sample(vector<vector<double>> & features_sample, vector<vector<int>> & outputs_sample);
 
 		/**
 		 * Perform model training.
 		 */
-		void fit(const vector<vector<double>> & features, const vector<vector<int>> & outputs) ;
+		void fit(const vector<vector<double>> && features, const vector<vector<int>> && labels) ;
 
 		/**
 		 * Perform model inference
 		 */
-		vector<vector<int>> predict(const vector<vector<int>> & train_outputs, const vector<vector<double>> & test_features);
+		vector<vector<int>> predict(const vector<vector<double>> & test_features);
 	};
 	
 }
