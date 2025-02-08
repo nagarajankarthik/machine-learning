@@ -39,15 +39,15 @@ namespace ml{
 	}
 
 
-	vector<unordered_map<int, int>> DecisionTreeClassifier::get_classes_frequencies(const vector<int> & indices, const vector<vector<int>> & outputs) {
+	vector<unordered_map<int, int>> DecisionTreeClassifier::get_classes_frequencies(const vector<int> & indices) {
 
-		int number_output_variables = outputs[0].size();
+		int number_output_variables = train_labels[0].size();
 
 		vector<unordered_map<int, int>> classes_frequencies {}; 
 		for (int i = 0; i < number_output_variables; i++) {
 			unordered_map<int, int> current_frequencies {};
 			for (int index:indices) {
-				int current_value = outputs[index][i];
+				int current_value = train_labels[index][i];
 				if (current_frequencies.count(current_value)) current_frequencies[current_value]++;
 				else current_frequencies.insert(std::make_pair(current_value, 1));
 			}
@@ -56,11 +56,11 @@ namespace ml{
 		return classes_frequencies;
 	}
 
-	double DecisionTreeClassifier::get_impurity(const vector<int> & indices, const vector<vector<int>> & outputs) {
+	double DecisionTreeClassifier::get_impurity(const vector<int> & indices) {
 
-		int number_outputs = outputs[0].size();
+		int number_outputs = train_labels[0].size();
 		int number_instances = indices.size();
-		vector<unordered_map<int, int>> classes_frequencies = get_classes_frequencies(indices, outputs);
+		vector<unordered_map<int, int>> classes_frequencies = get_classes_frequencies(indices);
 
 		double mean_impurity = 0.0;
 
@@ -92,7 +92,7 @@ namespace ml{
 	}
 
 
-	pair<shared_ptr<TreeNode>, shared_ptr<TreeNode>> DecisionTreeClassifier::split_node(shared_ptr<TreeNode> node, const vector<vector<double>> & features, const vector<vector<int>> & outputs) {
+	pair<shared_ptr<TreeNode>, shared_ptr<TreeNode>> DecisionTreeClassifier::split_node(shared_ptr<TreeNode> node) {
 
 		vector<int> data_indices = node->node_indices;
 
@@ -108,7 +108,7 @@ namespace ml{
 		
 		pair<shared_ptr<TreeNode>, shared_ptr<TreeNode>> children {nullptr, nullptr};
 
-		int number_features = features[0].size();
+		int number_features = train_features[0].size();
 		vector<int> feature_indices(number_features, 0);
 		for (int i = 0; i < number_features; i++) feature_indices[i] = i;
 		std::shuffle(feature_indices.begin(), feature_indices.end(), std::default_random_engine(random_seed));
@@ -116,20 +116,20 @@ namespace ml{
 		for (int i = 0; i < max_features; i++) {
 			unordered_set<double> unique_values {};
 			int feature_index = feature_indices[i];
-			for (int data_index:data_indices) unique_values.insert(features[data_index][feature_index]);
+			for (int data_index:data_indices) unique_values.insert(train_features[data_index][feature_index]);
 			vector<int> left_indices {};
 			vector<int> right_indices {};
 			for (double value:unique_values) {
 				for (int data_index:data_indices) {
-					double current_value = features[data_index][feature_index];
+					double current_value = train_features[data_index][feature_index];
 					if (current_value <= value) left_indices.push_back(data_index);
 					else right_indices.push_back(data_index);
 				}
 
 					// Compare impurities of current node and left and right splits
 				if (left_indices.empty() || right_indices.empty()) continue;
-				double left_impurity = get_impurity(left_indices, outputs);
-				double right_impurity = get_impurity(right_indices, outputs);
+				double left_impurity = get_impurity(left_indices);
+				double right_impurity = get_impurity(right_indices);
 				double average_child_impurity = (1.0*left_indices.size()/data_indices.size())*left_impurity + (1.0*right_indices.size()/data_indices.size())*right_impurity ;
 				double impurity_reduction = parent_impurity - average_child_impurity;
 				if (impurity_reduction > max_impurity_reduction) {
@@ -159,14 +159,14 @@ namespace ml{
 			total_nodes += 2;
 			max_depth = max(max_depth, 1 + node->depth);
 			number_splits++;
-			feature_importances[best_feature_split] += (1.0*data_indices.size()/features.size())*max_impurity_reduction;
+			feature_importances[best_feature_split] += (1.0*data_indices.size()/train_features.size())*max_impurity_reduction;
 		} else number_leaf_nodes++;
 
 		return children;
 
 	}
 
-	void DecisionTreeClassifier::breadth_first_search(const vector<vector<double>> & features, const vector<vector<int>> & outputs) {
+	void DecisionTreeClassifier::breadth_first_search() {
 
 		list<shared_ptr<TreeNode>> node_queue {};
 		node_queue.push_back(root);
@@ -174,7 +174,7 @@ namespace ml{
 		while (!node_queue.empty()) {
 			shared_ptr<TreeNode> current_node = node_queue.front() ;
 			node_queue.pop_front();
-			pair<shared_ptr<TreeNode>, shared_ptr<TreeNode>> children = split_node(current_node, features, outputs);
+			pair<shared_ptr<TreeNode>, shared_ptr<TreeNode>> children = split_node(current_node);
 			shared_ptr<TreeNode> left_child = children.first;
 			shared_ptr<TreeNode> right_child = children.second;
 			if (left_child != nullptr) {
@@ -188,21 +188,21 @@ namespace ml{
 
 	}
 
-	void DecisionTreeClassifier::dfs_recurse(shared_ptr<TreeNode> node, const vector<vector<double>> & features, const vector<vector<int>> & outputs) {
-		pair<shared_ptr<TreeNode>, shared_ptr<TreeNode>> children = split_node(node, features, outputs);
+	void DecisionTreeClassifier::dfs_recurse(shared_ptr<TreeNode> node)  {
+		pair<shared_ptr<TreeNode>, shared_ptr<TreeNode>> children = split_node(node);
 		shared_ptr<TreeNode> left_child = children.first;
 		shared_ptr<TreeNode> right_child = children.second;
 		if (left_child != nullptr) {
-			dfs_recurse(left_child, features, outputs);
-			dfs_recurse(right_child, features, outputs);
+			dfs_recurse(left_child);
+			dfs_recurse(right_child);
 		}
 
 	}
 
 
-	void DecisionTreeClassifier::depth_first_search(const vector<vector<double>> & features, const vector<vector<int>> & outputs) {
-		dfs_recurse(root, features, outputs);
+	void DecisionTreeClassifier::depth_first_search() {
 
+		dfs_recurse(root);
 		double feature_importances_sum = accumulate(feature_importances.begin(), feature_importances.end(), 0.);
 		for (double value:feature_importances) value /= feature_importances_sum;
 
@@ -210,34 +210,37 @@ namespace ml{
 
 
 
-	void DecisionTreeClassifier::fit(const vector<vector<double>> & features, const vector<vector<int>> & outputs) {
+	void DecisionTreeClassifier::fit(const vector<vector<double>> && features, const vector<vector<int>> && labels) {
+
+		train_features = features;
+		train_labels = labels;
 
 
 		root = nullptr;
-		int number_features = features[0].size();
+		int number_features = train_features[0].size();
 		max_features = (int) round(max_feature_fraction*number_features);
 
 		int number_instances = features.size();
 		vector<int> all_indices(number_instances, 0);
 		for (int i = 0; i < all_indices.size(); i++) all_indices[i] = i;
 		root = make_shared<TreeNode>(TreeNode(all_indices, 0));
-		root->impurity = get_impurity(all_indices, outputs);
+		root->impurity = get_impurity(all_indices);
 		total_nodes = 1;
 
 
-		logger->log(DEBUG, "Number of training instances = " + to_string(features.size()));
+		logger->log(DEBUG, "Number of training instances = " + to_string(train_features.size()));
 
-		logger->log(DEBUG, "Number of features = " + to_string(features[0].size()));
-		logger->log(DEBUG, "Number of outputs = " + to_string(outputs[0].size()));
+		logger->log(DEBUG, "Number of features = " + to_string(train_features[0].size()));
+		logger->log(DEBUG, "Number of outputs = " + to_string(train_labels[0].size()));
 		feature_importances.resize(number_features);
 		fill(feature_importances.begin(), feature_importances.end(), 0.);
-		if (impurity_method == "breadth") this->breadth_first_search(features, outputs);
-		else this -> depth_first_search(features, outputs);
+		if (impurity_method == "breadth") this->breadth_first_search();
+		else this -> depth_first_search();
 		report_fit_results();
 	}
 
 
-	vector<vector<int>> DecisionTreeClassifier::predict(const vector<vector<int>> & train_outputs, const vector<vector<double>> & test_features) { 
+	vector<vector<int>> DecisionTreeClassifier::predict(const vector<vector<double>> & test_features) { 
 		if (this->root == nullptr) {
 			logger->log(ERROR, "Decision tree must be grown by calling fit method before performing inference.");
 			return {};
@@ -249,7 +252,7 @@ namespace ml{
 
 		vector<vector<int>> predictions(number_test_instances, tmp);
 
-		int number_outputs = train_outputs[0].size();
+		int number_outputs = train_labels[0].size();
 
 		for (int j = 0; j < number_test_instances; j++) {
 			vector<double> instance_features = test_features[j];
@@ -263,7 +266,7 @@ namespace ml{
 				else current_node = current_node->right_child;
 			}
 			int current_leaf_size = current_node->node_indices.size();
-			vector<unordered_map<int, int>> classes_frequencies = get_classes_frequencies(current_node-> node_indices, train_outputs);
+			vector<unordered_map<int, int>> classes_frequencies = get_classes_frequencies(current_node-> node_indices);
 			vector<int> current_predictions (number_outputs,0);
 			for (int i = 0; i < number_outputs; i++) {
 				unordered_map<int, int> current_frequencies = classes_frequencies[i];
