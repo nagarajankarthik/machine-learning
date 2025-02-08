@@ -51,11 +51,11 @@ int main(int argc, char *argv[])
 			DecisionTreeClassifier decision_tree(model_parameters, logger);
 			logger->log(INFO, "Training " + model_type);
 			logger->log(INFO,"Data file used was " + data_path);
-			decision_tree.fit(train_features, train_outputs_int);
-			vector<vector<int>> predictions = decision_tree.predict(train_outputs_int, test_features);
 			vector<unordered_set<int>> unique_classes = utils.get_unique_classes(train_outputs_int);
 			vector<unordered_set<int>> unique_classes_test = utils.get_unique_classes(test_outputs_int);
 			for (int i = 0; i < unique_classes.size(); i++) unique_classes[i].insert(unique_classes_test[i].begin(), unique_classes_test[i].end());
+			decision_tree.fit(std::move(train_features), std::move(train_outputs_int));
+			vector<vector<int>> predictions = decision_tree.predict(test_features);
 			vector<vector<int>> confusion_matrix = utils.get_confusion_matrix(predictions, test_outputs_int, unique_classes[0], 0);
 			logger->log(INFO, "Confusion matrix for decision tree classifier");
 			logger->log(INFO, utils.array_2d_to_string(confusion_matrix));
@@ -63,11 +63,11 @@ int main(int argc, char *argv[])
 			RandomForestClassifier random_forest(model_parameters, logger);
 			logger->log(INFO, "Training " + model_type);
 			logger->log(INFO,"Data file used was " + data_path);
-			random_forest.fit(train_features, train_outputs_int);
-			vector<vector<int>> predictions = random_forest.predict(train_outputs_int, test_features);
 			vector<unordered_set<int>> unique_classes = utils.get_unique_classes(train_outputs_int);
 			vector<unordered_set<int>> unique_classes_test = utils.get_unique_classes(test_outputs_int);
 			for (int i = 0; i < unique_classes.size(); i++) unique_classes[i].insert(unique_classes_test[i].begin(), unique_classes_test[i].end());
+			random_forest.fit(std::move(train_features), std::move(train_outputs_int));
+			vector<vector<int>> predictions = random_forest.predict(test_features);
 			vector<vector<int>> confusion_matrix = utils.get_confusion_matrix(predictions, test_outputs_int, unique_classes[0], 0);
 			logger->log(INFO, "Confusion matrix for random forest classifier");
 			logger->log(INFO, utils.array_2d_to_string(confusion_matrix));
