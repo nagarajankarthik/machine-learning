@@ -12,7 +12,7 @@ overview
 ```{toctree}
 :maxdepth: 2
 :caption: API Reference
-decision_tree
-random_forest
+decision_tree_classifier
+random_forest_classifier
 utilities
 ```
