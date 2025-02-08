@@ -57,7 +57,7 @@ namespace ml
 	    for (int i = 0; i < number_trees; i++) {
 		    shared_ptr<DecisionTreeClassifier> classifier_tree (new DecisionTreeClassifier(parameters, logger));
 		    get_bootstrap_sample(features_sample, labels_sample);
-		    classifier_tree ->fit(features_sample, labels_sample);
+		    classifier_tree ->fit(std::move(features_sample), std::move(labels_sample));
 		    trees.push_back(classifier_tree);
 	    }
     
