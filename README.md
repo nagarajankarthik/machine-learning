@@ -11,8 +11,7 @@ The input parameters should be specified in a json file. A representative exampl
 ```
 {
 	"general": {
-		"logfile": "logs.txt",
-		"version_control":"false"
+		"logfile": "logs.txt"
 	},
 	"models": [
 		{
