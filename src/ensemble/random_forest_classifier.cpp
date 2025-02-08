@@ -23,16 +23,16 @@ namespace ml
 	}
 
 
-	void RandomForestClassifier::get_bootstrap_sample(const vector<vector<double>> & features,const vector<vector<int>> & outputs, vector<vector<double>> & features_sample, vector<vector<int>> & outputs_sample) {
-		int number_instances = features.size();
+	void RandomForestClassifier::get_bootstrap_sample(vector<vector<double>> & features_sample, vector<vector<int>> & outputs_sample) {
+		int number_instances = train_features.size();
 		vector<int> data_indices(number_instances, 0);
 
 		std::uniform_int_distribution<int> distribution_uniform(0, number_instances - 1);
 	       	
 		for (int i = 0; i < number_instances; i++) {
 			auto random_integer = distribution_uniform(random_generator);
-			vector<double> features_random = features[random_integer];
-			vector<int> outputs_random = outputs[random_integer];
+			vector<double> features_random = train_features[random_integer];
+			vector<int> outputs_random = train_labels[random_integer];
 			features_sample[i].assign(features_random.begin(), features_random.end());
 			outputs_sample[i].assign(outputs_random.begin(), outputs_random.end());
 		}
@@ -40,45 +40,49 @@ namespace ml
 
 
 	
-    void RandomForestClassifier::fit(const vector<vector<double>> & features, const vector<vector<int>> & outputs) {
+    void RandomForestClassifier::fit(const vector<vector<double>> && features, const vector<vector<int>> && labels) {
 
 	    trees.clear();
-	    int number_instances = features.size();
+
+	    train_features = features;
+	    train_labels = labels ;
+
+	    int number_instances = train_features.size();
 	    vector<vector<double>> features_sample {}; 
-	    features_sample.assign(features.begin(), features.end());
-	    vector<vector<int>> outputs_sample {};
-	    outputs_sample.assign(outputs.begin(), outputs.end());
+	    features_sample.assign(train_features.begin(), train_features.end());
+	    vector<vector<int>> labels_sample {};
+	    labels_sample.assign(train_labels.begin(), train_labels.end());
 
 
 	    for (int i = 0; i < number_trees; i++) {
 		    shared_ptr<DecisionTreeClassifier> classifier_tree (new DecisionTreeClassifier(parameters, logger));
-		    get_bootstrap_sample(features, outputs, features_sample, outputs_sample);
-		    classifier_tree ->fit(features_sample, outputs_sample);
+		    get_bootstrap_sample(features_sample, labels_sample);
+		    classifier_tree ->fit(features_sample, labels_sample);
 		    trees.push_back(classifier_tree);
 	    }
     
     }
 
-	vector<vector<int>> RandomForestClassifier::predict(const vector<vector<int>> & train_outputs, const vector<vector<double>> & test_features) {
+	vector<vector<int>> RandomForestClassifier::predict(const vector<vector<double>> & test_features) {
 
 		unordered_map<int, int> tmp {};
 		int number_test_instances = test_features.size();
-		int number_outputs = train_outputs[0].size();
+		int number_outputs = train_labels[0].size();
 		int list_map_size = number_test_instances * number_outputs;
 		vector<unordered_map<int,int>> list_freq_map(list_map_size, tmp) ;
-			for (auto tree:trees) {
-				vector<vector<int>> current_predictions = tree->predict(train_outputs, test_features);
-				for (int i = 0; i < number_test_instances; i++) {
-					for (int j = 0; j < number_outputs;j++) {
-						int predicted_class = current_predictions[i][j];
-						int index = i*number_outputs +j;
-						unordered_map<int,int> current_map = list_freq_map.at(index);
-						if (current_map.count(predicted_class)) current_map[predicted_class]++;
-						else current_map.insert(make_pair(predicted_class, 1));
-						list_freq_map[index] = current_map;
+		for (auto tree:trees) {
+			vector<vector<int>> current_predictions = tree->predict(test_features);
+			for (int i = 0; i < number_test_instances; i++) {
+				for (int j = 0; j < number_outputs;j++) {
+					int predicted_class = current_predictions[i][j];
+					int index = i*number_outputs +j;
+					unordered_map<int,int> current_map = list_freq_map.at(index);
+					if (current_map.count(predicted_class)) current_map[predicted_class]++;
+					else current_map.insert(make_pair(predicted_class, 1));
+					list_freq_map[index] = current_map;
+				}
 			}
 		}
-	}
 			vector<int> tmp2(number_outputs, 0);
 			vector<vector<int>> test_predictions(number_test_instances, tmp2);
 
