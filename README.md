@@ -51,7 +51,7 @@ When performing inference, the tree grown during the training phase is traversed
 
 The current implementation of random forests is for classification problems only.
 
-During the training process, the random forest grows a number of decision trees using the procedure described above. The data used to grow each tree is obtained from the training data supplied to this module using bootstrap sampling.
+During the training process, the random forest grows a number of decision trees using the procedure described above. The data used to grow each tree is obtained from the training data supplied to this module using [bootstrap sampling](https://www.geeksforgeeks.org/bootstrap-method/).
 
 During inference, the prediction of each tree is obtained for each test instance. The class that is predicted by the most number of trees is returned as the predicted class for that test instance.
  
