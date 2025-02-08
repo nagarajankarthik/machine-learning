@@ -225,7 +225,7 @@ namespace ml{
 		if (impurity_method == "breadth") this->breadth_first_search();
 		else this -> depth_first_search(root);
 		double feature_importances_sum = accumulate(feature_importances.begin(), feature_importances.end(), 0.);
-		for (double value:feature_importances) value /= feature_importances_sum;
+		for (int i = 0; i < number_features; i++) feature_importances[i] /= feature_importances_sum;
 		report_fit_results();
 	}
 
