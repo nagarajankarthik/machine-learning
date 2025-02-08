@@ -146,15 +146,9 @@ namespace ml
 		void breadth_first_search();
 
 		/**
-		 * Perform recursive depth first search.
-		 */
-		void dfs_recurse(shared_ptr<TreeNode> node) ;
-
-
-		/**
 		 * Grow decision tree using depth first search.
 		 */
-		void depth_first_search();
+		void depth_first_search(shared_ptr<TreeNode> node);
 
 		/**
 		 * Grow a decision tree using the recursive partitioning algorithm.
