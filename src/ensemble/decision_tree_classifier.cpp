@@ -183,31 +183,19 @@ namespace ml{
 			}
 		}
 
-		double feature_importances_sum = accumulate(feature_importances.begin(), feature_importances.end(), 0.);
-		for (double value:feature_importances) value /= feature_importances_sum;
 
 	}
 
-	void DecisionTreeClassifier::dfs_recurse(shared_ptr<TreeNode> node)  {
+	void DecisionTreeClassifier::depth_first_search(shared_ptr<TreeNode> node)  {
 		pair<shared_ptr<TreeNode>, shared_ptr<TreeNode>> children = split_node(node);
 		shared_ptr<TreeNode> left_child = children.first;
 		shared_ptr<TreeNode> right_child = children.second;
 		if (left_child != nullptr) {
-			dfs_recurse(left_child);
-			dfs_recurse(right_child);
+			depth_first_search(left_child);
+			depth_first_search(right_child);
 		}
 
 	}
-
-
-	void DecisionTreeClassifier::depth_first_search() {
-
-		dfs_recurse(root);
-		double feature_importances_sum = accumulate(feature_importances.begin(), feature_importances.end(), 0.);
-		for (double value:feature_importances) value /= feature_importances_sum;
-
-	}
-
 
 
 	void DecisionTreeClassifier::fit(const vector<vector<double>> && features, const vector<vector<int>> && labels) {
@@ -235,7 +223,9 @@ namespace ml{
 		feature_importances.resize(number_features);
 		fill(feature_importances.begin(), feature_importances.end(), 0.);
 		if (impurity_method == "breadth") this->breadth_first_search();
-		else this -> depth_first_search();
+		else this -> depth_first_search(root);
+		double feature_importances_sum = accumulate(feature_importances.begin(), feature_importances.end(), 0.);
+		for (double value:feature_importances) value /= feature_importances_sum;
 		report_fit_results();
 	}
 
