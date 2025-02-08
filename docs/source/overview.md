@@ -1,6 +1,8 @@
 # Machine Learning Algorithms
 
-This repository implements some commonly used machine learning algorithms. Currently, random forests and neural networks have been implemented.
+This repository implements some commonly used machine learning algorithms. Currently, decision trees and random forests have been implemented.
+
+A neural network module is currently being developed.
 
 
 ## Dependencies
@@ -8,7 +10,7 @@ This repository implements some commonly used machine learning algorithms. Curre
 The following dependencies need to be installed before the code can be run. 
 
 
-- gcc compiler version 11.4.0
+- g++ compiler version 11.4.0
 - cmake version 3.22.1
 - Sphinx 2.2.11-id64-release (95ae9a6)
 - doxygen version 1.9.1  
