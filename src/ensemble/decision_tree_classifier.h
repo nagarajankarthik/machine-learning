@@ -100,9 +100,17 @@ namespace ml
 		/**
 		 * Pointer to tree root
 		 */
-
 		shared_ptr<TreeNode> root ;
 
+		/**
+		 * Features for training data
+		 */
+		vector<vector<double>> train_features {} ;
+
+		/**
+		 * Labels for training data
+		 */
+		vector<vector<int>> train_labels {} ;
 
 		/**
 		 * Constructor
@@ -117,37 +125,36 @@ namespace ml
 		/**
 		 * Compile number of occurrences of each unique class for each output variable.
 		 */
-		vector<unordered_map<int, int>> get_classes_frequencies(const vector<int> & indices, const vector<vector<int>> & outputs) ;
+		vector<unordered_map<int, int>> get_classes_frequencies(const vector<int> & indices)  ;
 
 		/**
 		 * Calculate node impurity by evaluating the impurity separately for each output variable using the gini or entropy method and averaging the result.
 		 * This is supposedly how scikit-learn implements a decision tree.
 		 * See https://stackoverflow.com/questions/50715574/how-is-the-impurity-decrease-of-a-split-computed-in-case-we-have-multiple-output
-
 		 */
-		double get_impurity(const vector<int> & indices, const vector<vector<int>> & outputs) ;
+		double get_impurity(const vector<int> & indices) ;
 
 		/**
 		 * Determine best feature and value for splitting a node.
 		 */
-		pair<shared_ptr<TreeNode>, shared_ptr<TreeNode>> split_node(shared_ptr<TreeNode> node, const vector<vector<double>> & features, const vector<vector<int>> & outputs) ;
+		pair<shared_ptr<TreeNode>, shared_ptr<TreeNode>> split_node(shared_ptr<TreeNode> node) ;
 
 
 		/**
 		 * Grow decision tree using breadth first search.
 		 */
-		void breadth_first_search(const vector<vector<double>> & features, const vector<vector<int>> & outputs);
+		void breadth_first_search();
 
 		/**
 		 * Perform recursive depth first search.
 		 */
-		void dfs_recurse(shared_ptr<TreeNode> node, const vector<vector<double>> & features, const vector<vector<int>> & outputs) ;
+		void dfs_recurse(shared_ptr<TreeNode> node) ;
 
 
 		/**
 		 * Grow decision tree using depth first search.
 		 */
-		void depth_first_search(const vector<vector<double>> & features, const vector<vector<int>> & outputs);
+		void depth_first_search();
 
 		/**
 		 * Grow a decision tree using the recursive partitioning algorithm.
@@ -157,7 +164,7 @@ namespace ml
 		/**
 		 * Perform inference using decision tree grown by call to fit method.
 		 */
-		vector<vector<int>> predict(const vector<vector<int>> & train_outputs, const vector<vector<double>> & test_features);
+		vector<vector<int>> predict(const vector<vector<double>> & test_features);
 
 		/**
 		 * Log characteristics of decision tree after training.
