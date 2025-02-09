@@ -3,30 +3,21 @@
  */
 #include "decision_tree_classifier.h"
 #include <random>
+#include <omp.h>
 
 using namespace std;
 
 namespace ml
 {
 
-	class RandomForestClassifier
+	class RandomForestClassifier: public BaseModel
 	{
 	public:
-
-		/**
-		 * Pointer to an instance of Logger
-		 */
-		shared_ptr<Logger> logger;
 
 		/**
 		 * Parameters to pass to Decision Tree constructor
 		 */
 		nlohmann::json parameters ;
-
-		/**
-		 * Random number engine
-		 */
-		std::mt19937 random_generator;
 
 		// Number of trees
 		int number_trees = 20;
@@ -35,16 +26,6 @@ namespace ml
 		 * An array of decision trees
 		 */
 		vector<shared_ptr<DecisionTreeClassifier>> trees {};
-
-		/**
-		 * Features for training data
-		 */
-		vector<vector<double>> train_features {};
-
-		/**
-		 * Labels for training data
-		 */
-		vector<vector<int>> train_labels {} ;
 
 		/**
 		 * Constructor
@@ -59,17 +40,22 @@ namespace ml
 		/**
 		 * Get bootstrap sample
 		 */
-		void get_bootstrap_sample(vector<vector<double>> & features_sample, vector<vector<int>> & outputs_sample);
+		void get_bootstrap_sample(vector<vector<double>> & features_sample, vector<vector<double>> & outputs_sample);
 
 		/**
 		 * Perform model training.
 		 */
-		void fit(const vector<vector<double>> && features, const vector<vector<int>> && labels) ;
+		void fit(const vector<vector<double>> && features, const vector<vector<double>> && labels) ;
 
 		/**
 		 * Perform model inference
 		 */
-		vector<vector<int>> predict(const vector<vector<double>> & test_features);
+		vector<vector<double>> predict(const vector<vector<double>> & test_features);
+
+		/**
+		 * Evaluate model using test data
+		 */
+		void evaluate(const vector<vector<double>> & test_features, const vector<vector<double>> & test_labels) ;
 	};
 	
 }
