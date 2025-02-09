@@ -13,8 +13,11 @@ The following dependencies need to be installed before the code can be run.
 - g++ compiler version 11.4.0
 - cmake version 3.22.1
 - Sphinx 2.2.11-id64-release (95ae9a6)
-- doxygen version 1.9.1  
+- doxygen version 1.9.1
+- OpenMP version 4.5 
 - python 3
+
+The OpenMP dependency is used for multi-threading and is optional.
 
 The following python packages need to be installed from the [Python Package Index](https://pypi.org/):
 
@@ -41,11 +44,17 @@ mkdir build
 
 ## Procedure to run the code
 
-1. Set the desired input parameter values in a json file following the [example](https://github.com/nagarajankarthik/machine-learning/blob/main/src/input.json) on the github page.
+1. Specify the number of OpenMP threads. This step is only required if multi-threading is being used:
 
-2. Navigate to the `build` directory described in the previous section.
+```
+export OMP_NUM_THREADS=4
+```
 
-3. Run a command similar to the following:
+2. Set the desired input parameter values in a json file following the [example](https://github.com/nagarajankarthik/machine-learning/blob/main/src/input.json) on the github page.
+
+3. Navigate to the `build` directory described in the previous section.
+
+4. Run a command similar to the following:
 
 ```
 src/ml [PATH_TO_JSON_INPUT]
