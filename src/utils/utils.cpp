@@ -1,5 +1,5 @@
 #include "utils.h"
-#include <iterator>
+#include "json.hpp"
 
 namespace ml
 {
@@ -7,31 +7,8 @@ namespace ml
 
 	Utilities::Utilities(shared_ptr<Logger> logger):logger(logger) {} ;	
 
-	vector<vector<int>> Utilities::get_confusion_matrix(const vector<vector<int>> &predictions, const vector<vector<int>> &test_outputs, unordered_set<int> unique_classes, int index_output)
-	{
-		int number_instances = test_outputs.size();
-		int number_classes = unique_classes.size();
-		vector<int> tmp(number_classes, 0);
-		vector<vector<int>> confusion_matrix(number_classes, tmp);
-		vector<int> unique_classes_array(unique_classes.begin(), unique_classes.end());
-		sort(unique_classes_array.begin(), unique_classes_array.end());
-		unordered_map<int, int> class_index{};
-		for (int i = 0; i < number_classes; i++)
-			class_index.insert(make_pair(unique_classes_array[i], i));
 
-		for (int i = 0; i < number_instances; i++)
-		{
-			int predicted_class = predictions[i][index_output];
-			int ground_truth_class = test_outputs[i][index_output];
-			int predicted_index = class_index[predicted_class];
-			int ground_truth_index = class_index[ground_truth_class];
-			confusion_matrix[ground_truth_index][predicted_index]++;
-		}
-
-		return confusion_matrix;
-	}
-
-	void Utilities::train_test_split(const vector<vector<double>> &features, const vector<vector<double>> &outputs, vector<vector<double>> &train_features, vector<vector<double>> &train_outputs, vector<vector<double>> &test_features, vector<vector<double>> &test_outputs, double train_ratio, bool shuffle_data, int random_seed)
+	TrainTestData Utilities::train_test_split(const vector<vector<double>> &features, const vector<vector<double>> &outputs)
 	{
 
 		if (features.size() != outputs.size())
@@ -57,89 +34,45 @@ namespace ml
 		if (shuffle_data)
 			std::shuffle(data_indices.begin(), data_indices.end(), std::default_random_engine(random_seed));
 
+		TrainTestData train_test ;
+
 		for (int i = 0; i < number_train; i++)
 		{
-			train_features.push_back(features[data_indices[i]]);
-			train_outputs.push_back(outputs[data_indices[i]]);
+			train_test.train_features.push_back(features[data_indices[i]]);
+			train_test.train_labels.push_back(outputs[data_indices[i]]);
 		}
 
 		for (int i = 0; i < number_test; i++)
 		{
-			test_features.push_back(features[data_indices[i + number_train]]);
-			test_outputs.push_back(outputs[data_indices[i + number_train]]);
+			train_test.test_features.push_back(features[data_indices[i + number_train]]);
+			train_test.test_labels.push_back(outputs[data_indices[i + number_train]]);
 		}
+
+		return train_test;
 	}
 
-	vector<vector<int>> Utilities::double_to_int(const vector<vector<double>> &data)
-	{
-		int m = data.size();
-		int n = data[0].size();
 
-		vector<vector<int>> data_int{};
+	TrainTestData Utilities::get_train_test_data(nlohmann::json model_parameters) {
+		string data_path = model_parameters["data"];
+		int random_seed = model_parameters["random_seed"];
+		vector<vector<double>> features {};
+		vector<vector<double>> outputs {};
+		read_data(data_path, features, outputs);
+		if (model_parameters.contains("shuffle_data")) shuffle_data = model_parameters["shuffle_data"];
+		if (model_parameters.contains("train_ratio")) train_ratio = model_parameters["train_ratio"];
+		if (model_parameters.contains("random_seed")) random_seed = model_parameters["random_seed"];
+		// train-test split
+		TrainTestData train_test = train_test_split(features, outputs);
 
-		for (int i = 0; i < m; i++)
-		{
-			vector<int> tmp{};
-			for (int j = 0; j < n; j++)
-			{
-				int int_element = (int)data[i][j];
-				tmp.push_back(int_element);
-			}
-			data_int.push_back(tmp);
-		}
-		return data_int;
+		return train_test;
 	}
 
-	template <class T>
-	string Utilities::array_2d_to_string(vector<vector<T>> matrix)
-	{
 
-		string result = "";
-		int m = matrix.size();
-		int n = matrix[0].size();
-		for (int i = 0; i < m; i++)
-		{
-			string row = "";
-			for (int j = 0; j < n; j++)
-			{
-				row += to_string(matrix[i][j]) + ", ";
-			}
-			result += row + "\n";
-		}
-		return result;
-	}
-
-	// Explicit instantiation of the template for int
-	template string Utilities::array_2d_to_string<int>(vector<vector<int>> matrix);
-
-	// Explicit instantiation of the template for double (if needed)
-	template string Utilities::array_2d_to_string<double>(vector<vector<double>> matrix);
-
-	vector<unordered_set<int>> Utilities::get_unique_classes(vector<vector<int>> outputs)
-	{
-
-		int number_outputs = outputs[0].size();
-
-		unordered_set<int> tmp{};
-
-		vector<unordered_set<int>> unique_classes(number_outputs, tmp);
-
-		for (int i = 0; i < outputs.size(); i++)
-		{
-			for (int j = 0; j < outputs[i].size(); j++)
-			{
-				int current_class = outputs[i][j];
-				unique_classes[j].insert(current_class);
-			}
-		}
-		return unique_classes;
-	}
-
-	nlohmann::json_abi_v3_11_3::json Utilities::read_json(std::string inputFileName)
+	nlohmann::json_abi_v3_11_3::json Utilities::read_json(std::string input_file)
 	{
 
 		std::ifstream inp;
-		inp.open(inputFileName);
+		inp.open(input_file);
 		std::stringstream buffer;
 		buffer << inp.rdbuf();
 		auto inputParameters = nlohmann::json::parse(buffer.str());

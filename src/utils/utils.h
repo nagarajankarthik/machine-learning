@@ -12,9 +12,47 @@ using namespace std;
 namespace ml
 {
 
+	struct TrainTestData {
+	
+		/**
+		 * Features of training data
+		 */
+		vector<vector<double>> train_features {} ;
+
+		/**
+		 * Labels of training data
+		 */
+		vector<vector<double>> train_labels {};
+
+		/**
+		 * Features of test data
+		 */
+		vector<vector<double>> test_features {} ;
+
+		/**
+		 * Labels of training data
+		 */
+		vector<vector<double>> test_labels {};
+	};
+
 	class Utilities
 	{
 	public:
+
+		/**
+		 * Proportion of input data to be used for training
+		 */
+		double train_ratio = 0.75;
+
+		/**
+		 * Whether the data should be randomly shuffled before splitting into train and test sets.
+		 */
+		bool shuffle_data = true;
+
+		/**
+		 * random seed for shuffling data
+		 */
+		int random_seed = 1;
 
 		/**
 		 * Default constructor for utilities
@@ -37,27 +75,13 @@ namespace ml
 
 		/** Split the input data for features and outputs into training and test sets.
 		 */
-		void train_test_split(const vector<vector<double>> &features, const vector<vector<double>> &outputs, vector<vector<double>> &train_features, vector<vector<double>> &train_outputs, vector<vector<double>> &test_features, vector<vector<double>> &test_outputs, double train_ratio, bool shuffle_data, int random_seed = 0);
+		TrainTestData train_test_split(const vector<vector<double>> &features, const vector<vector<double>> &outputs);
 
 		/**
-		 * Convert a 2D array containing elements of type double to a 2D array containing elements of type int.
+		 * Read data from input file and split it into training and test sets.
 		 */
-		vector<vector<int>> double_to_int(const vector<vector<double>> &data);
+		TrainTestData get_train_test_data(nlohmann::json model_parameters);
 
-		/**
-		 * Convert input 2D array into a single string.
-		 */
-		template <class T>
-		string array_2d_to_string(vector<vector<T>> matrix);
-
-		/**
-		 * Get unique entries in each column of an input 2D vector containing integers.
-		 */
-		vector<unordered_set<int>> get_unique_classes(vector<vector<int>> outputs);
-
-		/** Get confusion matrix using predictions of classification algorithm and ground truth
-		 */
-		vector<vector<int>> get_confusion_matrix(const vector<vector<int>> &predictions, const vector<vector<int>> &test_outputs, unordered_set<int> unique_classes, int index_output);
 
 		/**
 		 *Read input parameters from a file in JSON format.
