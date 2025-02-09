@@ -9,8 +9,7 @@
 #include <unordered_set>
 #include <memory>
 #include <random>
-#include "../utils/json.hpp"
-#include "../utils/logging.h"
+#include "../base_model/base_model.h"
 
 using namespace std;
 
@@ -33,18 +32,9 @@ namespace ml
 	/**
 	 * Implement decision tree using recursive partitioning algorithm.
 	 */
-	class DecisionTreeClassifier
+	class DecisionTreeClassifier : public BaseModel
 	{
 	public:
-		/**
-		 * Pointer to an instance of Logger.
-		 */
-		shared_ptr<Logger> logger ;
-
-		/**
-		 * Random seed
-		 */
-		int random_seed = 0;
 
 		/**
 		 * Criterion to quantify individual node impurities.
@@ -102,15 +92,6 @@ namespace ml
 		 */
 		shared_ptr<TreeNode> root ;
 
-		/**
-		 * Features for training data
-		 */
-		vector<vector<double>> train_features {} ;
-
-		/**
-		 * Labels for training data
-		 */
-		vector<vector<int>> train_labels {} ;
 
 		/**
 		 * Constructor
@@ -125,7 +106,7 @@ namespace ml
 		/**
 		 * Compile number of occurrences of each unique class for each output variable.
 		 */
-		vector<unordered_map<int, int>> get_classes_frequencies(const vector<int> & indices)  ;
+		vector<unordered_map<double, int, DoubleHash, DoubleEqual>> get_classes_frequencies(const vector<int> & indices)  ;
 
 		/**
 		 * Calculate node impurity by evaluating the impurity separately for each output variable using the gini or entropy method and averaging the result.
@@ -154,17 +135,22 @@ namespace ml
 		 * Grow a decision tree using the recursive partitioning algorithm.
 		 * Calls either depth_first_search or breadth_first_search.
 		 */
-		void fit(const vector<vector<double>> && features, const vector<vector<int>> && outputs);
+		void fit(const vector<vector<double>> && features, const vector<vector<double>> && labels) ;
 		/**
 		 * Perform inference using decision tree grown by call to fit method.
 		 */
-		vector<vector<int>> predict(const vector<vector<double>> & test_features);
+		vector<vector<double>> predict(const vector<vector<double>> & test_features);
 
 		/**
 		 * Log characteristics of decision tree after training.
 		 */
 		void report_fit_results();
 
+
+		/**
+		 * Evaluate model performance on test data
+		 */
+		void evaluate(const vector<vector<double>> & test_features, const vector<vector<double>> & test_labels) ; 
 
 
 	};

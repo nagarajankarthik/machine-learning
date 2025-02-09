@@ -1,7 +1,6 @@
 #include "decision_tree_classifier.h"
 
 #include <limits>
-#include <random>
 #include <string>
 #include <utility>
 #include <vector>
@@ -9,7 +8,7 @@
 using namespace std;
 
 namespace ml{
-	DecisionTreeClassifier::DecisionTreeClassifier(nlohmann::json parameters, shared_ptr<Logger> logger): logger(logger) {
+	DecisionTreeClassifier::DecisionTreeClassifier(nlohmann::json parameters, shared_ptr<Logger> logger): BaseModel(parameters, logger)  {
 
 		if (parameters.contains("impurity_method")) {
 		       string impurity_method_input = parameters["impurity_method"] ;
@@ -32,20 +31,16 @@ namespace ml{
 				else max_feature_fraction = max_feature_fraction_input;
 		}
 
-		if (parameters.contains("random_seed")) {
-			int random_seed_input = parameters["random_seed"];
-			if (random_seed_input > -1) random_seed = random_seed_input;
-		}
 	}
 
 
-	vector<unordered_map<int, int>> DecisionTreeClassifier::get_classes_frequencies(const vector<int> & indices) {
+	vector<unordered_map<double, int, DoubleHash, DoubleEqual>> DecisionTreeClassifier::get_classes_frequencies(const vector<int> & indices) {
 
 		int number_output_variables = train_labels[0].size();
 
-		vector<unordered_map<int, int>> classes_frequencies {}; 
+		vector<unordered_map<double, int, DoubleHash, DoubleEqual>> classes_frequencies {}; 
 		for (int i = 0; i < number_output_variables; i++) {
-			unordered_map<int, int> current_frequencies {};
+			unordered_map<double, int, DoubleHash, DoubleEqual> current_frequencies {};
 			for (int index:indices) {
 				int current_value = train_labels[index][i];
 				if (current_frequencies.count(current_value)) current_frequencies[current_value]++;
@@ -60,16 +55,16 @@ namespace ml{
 
 		int number_outputs = train_labels[0].size();
 		int number_instances = indices.size();
-		vector<unordered_map<int, int>> classes_frequencies = get_classes_frequencies(indices);
+		vector<unordered_map<double, int, DoubleHash, DoubleEqual>> classes_frequencies = get_classes_frequencies(indices);
 
 		double mean_impurity = 0.0;
 
 
 		if (impurity_method == "gini") {
 			for (int i = 0; i < number_outputs; i++) {
-				unordered_map<int, int> current_frequencies = classes_frequencies[i];
+				unordered_map<double, int, DoubleHash, DoubleEqual> current_frequencies = classes_frequencies[i];
 				double output_impurity = 0.0;
-				for (unordered_map<int, int>::iterator it = current_frequencies.begin(); it != current_frequencies.end(); it++) {
+				for (auto it = current_frequencies.begin(); it != current_frequencies.end(); it++) {
 					double class_probability = 1.0*(it->second)/number_instances;
 					output_impurity += class_probability*(1.0 - class_probability);
 				}
@@ -77,9 +72,9 @@ namespace ml{
 			}
 		} else if (impurity_method == "entropy") {
 			for (int i = 0; i < number_outputs; i++) {
-				unordered_map<int, int> current_frequencies = classes_frequencies[i];
+				unordered_map<double, int, DoubleHash, DoubleEqual> current_frequencies = classes_frequencies[i];
 				double output_impurity = 0.0;
-				for (unordered_map<int, int>::iterator it = current_frequencies.begin(); it != current_frequencies.end(); it++) {
+				for (auto it = current_frequencies.begin(); it != current_frequencies.end(); it++) {
 					double class_probability = 1.0*(it->second)/number_instances;
 					output_impurity += -1.0*class_probability*log(1.0 - class_probability);
 				}
@@ -111,7 +106,7 @@ namespace ml{
 		int number_features = train_features[0].size();
 		vector<int> feature_indices(number_features, 0);
 		for (int i = 0; i < number_features; i++) feature_indices[i] = i;
-		std::shuffle(feature_indices.begin(), feature_indices.end(), std::default_random_engine(random_seed));
+		std::shuffle(feature_indices.begin(), feature_indices.end(), random_generator);
 
 		for (int i = 0; i < max_features; i++) {
 			unordered_set<double> unique_values {};
@@ -198,7 +193,7 @@ namespace ml{
 	}
 
 
-	void DecisionTreeClassifier::fit(const vector<vector<double>> && features, const vector<vector<int>> && labels) {
+	void DecisionTreeClassifier::fit(const vector<vector<double>> && features, const vector<vector<double>> && labels) {
 
 		train_features = features;
 		train_labels = labels;
@@ -230,7 +225,7 @@ namespace ml{
 	}
 
 
-	vector<vector<int>> DecisionTreeClassifier::predict(const vector<vector<double>> & test_features) { 
+	vector<vector<double>> DecisionTreeClassifier::predict(const vector<vector<double>> & test_features) { 
 		if (this->root == nullptr) {
 			logger->log(ERROR, "Decision tree must be grown by calling fit method before performing inference.");
 			return {};
@@ -238,9 +233,8 @@ namespace ml{
 
 		int number_test_instances = test_features.size();
 
-		vector<int> tmp {};
-
-		vector<vector<int>> predictions(number_test_instances, tmp);
+		vector<double> tmp {};
+		vector<vector<double>> predictions(number_test_instances, tmp);
 
 		int number_outputs = train_labels[0].size();
 
@@ -256,13 +250,13 @@ namespace ml{
 				else current_node = current_node->right_child;
 			}
 			int current_leaf_size = current_node->node_indices.size();
-			vector<unordered_map<int, int>> classes_frequencies = get_classes_frequencies(current_node-> node_indices);
-			vector<int> current_predictions (number_outputs,0);
+			vector<unordered_map<double, int, DoubleHash, DoubleEqual>> classes_frequencies = get_classes_frequencies(current_node-> node_indices);
+			vector<double> current_predictions (number_outputs,0);
 			for (int i = 0; i < number_outputs; i++) {
-				unordered_map<int, int> current_frequencies = classes_frequencies[i];
-				int predicted_class = 0;
+				unordered_map<double, int, DoubleHash, DoubleEqual> current_frequencies = classes_frequencies[i];
+				double predicted_class = 0.;
 				double max_probability = 0.;
-				for (unordered_map<int, int>::iterator it = current_frequencies.begin(); it != current_frequencies.end(); it++) {
+				for (auto it = current_frequencies.begin(); it != current_frequencies.end(); it++) {
 					double class_probability = 1.0*(it->second)/current_leaf_size;
 					if (class_probability > max_probability) {
 						max_probability = class_probability;
@@ -274,6 +268,12 @@ namespace ml{
 			predictions[j] = current_predictions;
 		}
 		return predictions;
+	}
+
+
+	void DecisionTreeClassifier::evaluate(const vector<vector<double>> & test_features, const vector<vector<double>> & test_labels) {
+		vector<vector<double>> test_predictions = predict(test_features);
+		get_confusion_matrices(test_predictions, test_labels);
 	}
 
 
