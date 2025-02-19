@@ -1,6 +1,7 @@
 #include "../utils/logging.h"
 #include <functional>
 #include <vector>
+#include <list>
 #include <memory>
 using namespace std;
 
@@ -28,7 +29,6 @@ namespace ml {
 			 */
 			shared_ptr<Tensor> input_first;
 
-
 			/**
 			 * Predecessor in computational graph
 			 */
@@ -42,12 +42,12 @@ namespace ml {
 			/**
 			 * Constructor to assign values
 			 */
-			Tensor(vector<double> values) ;
+			Tensor(vector<double> values, vector<int> shape) ;
 
 			/**
 			 * Constructor to assign values and inputs
 			 */
-			Tensor(vector<double> values, shared_ptr<Tensor>, shared_ptr<Tensor>);
+			Tensor(vector<double> values, vector<int> shape, shared_ptr<Tensor> input_first, shared_ptr<Tensor> input_second);
 
 			/**
 			 * Destructor
@@ -69,6 +69,17 @@ namespace ml {
 			 */
 			void backward(const vector<double> & seed) ;
 		private:
+
+			/**
+			 * Used to support multi-dimensional indexing
+			 */
+			vector<int> strides = {};
+
+			/**
+			 * Update strides whenever shape of Tensor changes
+			 */
+			void update_strides() ;
+
 			/**
 			 * Pointer to gradient function
 			 */
