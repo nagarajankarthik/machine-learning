@@ -24,9 +24,30 @@ namespace ml {
 			vector<int> shape = {};
 
 			/**
+			 * Predecessor in computational graph
+			 */
+			shared_ptr<Tensor> input_first;
+
+
+			/**
+			 * Predecessor in computational graph
+			 */
+			shared_ptr<Tensor> input_second;
+
+			/**
 			 * Constructor
 			 */
 			Tensor() {} ;
+			
+			/**
+			 * Constructor to assign values
+			 */
+			Tensor(vector<double> values) ;
+
+			/**
+			 * Constructor to assign values and inputs
+			 */
+			Tensor(vector<double> values, shared_ptr<Tensor>, shared_ptr<Tensor>);
 
 			/**
 			 * Destructor
