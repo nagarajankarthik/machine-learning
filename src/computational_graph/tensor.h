@@ -83,7 +83,7 @@ namespace ml {
 			/**
 			 * Pointer to gradient function
 			 */
-			std::function<void(const vector<double>, shared_ptr<Tensor>, shared_ptr<Tensor>)> backward_function ;
+			std::function<void(const vector<double> &, shared_ptr<Tensor>, shared_ptr<Tensor>)> backward_function ;
 
 	};
 }// namespace ml
