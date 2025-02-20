@@ -33,11 +33,20 @@ namespace ml {
 		strides.assign(strides.rbegin(), strides.rend());
 	}
 
+	void Tensor::reshape(vector<int> new_shape) {
+		int new_size = 1;
+		for (int i = 0; i < new_shape.size(); i++) {
+			new_size *= new_shape[i];
+		}
+		if (new_size == values.size()) {
+			shape = new_shape;
+			update_strides();
+		}
+	}
 
-
-
-
-
+	void Tensor::backward(const vector<double>& seed) {
+		backward_function(seed, input_first, input_second);
+	}
 
 
 }// namespace ml
