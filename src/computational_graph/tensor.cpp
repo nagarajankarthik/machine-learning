@@ -19,7 +19,7 @@ namespace ml {
 
 
 
-	double Tensor::at(vector<int> position) {
+	double Tensor::get_element(vector<int> position) {
 		int index = 0;
 		for (int i = 0; i < shape.size(); i++) {
 			index += strides[i]*position[i];
@@ -27,15 +27,41 @@ namespace ml {
 		return values[index];
 	}
 
-	vector<vector<double>> Tensor::get_matrix_at(vector<int> position) const {
-		if (position.size() != shape.size() - 2) {
+	vector<vector<double>> Tensor::get_matrix(vector<int> position) const {
+		if (position.size() < shape.size() - 2) {
 			logger->log(ERROR, "The specified position has " + to_string(position.size()) + " indices, but the tensor has " + to_string(shape.size()) + " dimensions");
 			exit(1);
 		}
 
+		// TODO: Move this to a separate function
+		// allow for broadcasting
+		list<int> position_list(position.begin(), position.end());
+		while(position_list.size() > shape.size() - 2) {
+			position_list.pop_front();
+		}
+		vector<int> new_position(position_list.begin(), position_list.end());
+
+		if (new_position.size() != shape.size() - 2) {
+			logger->log(ERROR, "The specified position has " + to_string(new_position.size()) + " indices, but the tensor has " + to_string(shape.size()) + " dimensions");
+			exit(1);
+		}
+
+		for (int i = 0; i < new_position.size(); i++) {
+			if (new_position[i] >= shape[i]) {
+				if (shape[i] == 1) {
+					new_position[i] = 0;
+				} else {
+					logger->log(ERROR, " Invalid index in get_matrix at dimension " + to_string(i) + ".");
+					logger->log(ERROR, " Attempted to access index " + to_string(new_position[i]) + " but the tensor has " + to_string(shape[i]) + " entries.");
+					exit(1);
+				}
+			}
+		}
+		// end of broadcasting logic. 
+
 		int index = 0;
 		for (int i = 0; i < shape.size(); i++) {
-			index += strides[i]*position[i];
+			index += strides[i]*new_position[i];
 		}
 		int number_rows = shape[shape.size() - 2];
 		int number_cols = shape[shape.size() - 1];
@@ -50,7 +76,7 @@ namespace ml {
 		return matrix;
 	}
 
-	void Tensor::set_matrix_at(vector<int> position,const vector<vector<double>>& matrix) {
+	void Tensor::set_matrix(vector<int> position,const vector<vector<double>>& matrix) {
 		if (position.size() != shape.size() - 2) {
 			logger->log(ERROR, "The specified position has " + to_string(position.size()) + " indices, but the tensor has " + to_string(shape.size()) + " dimensions");
 			exit(1);
