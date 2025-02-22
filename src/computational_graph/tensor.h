@@ -32,12 +32,12 @@ namespace ml {
 			/**
 			 * Predecessor in computational graph
 			 */
-			shared_ptr<Tensor> input_first;
+			shared_ptr<Tensor> input_first = nullptr;
 
 			/**
 			 * Predecessor in computational graph
 			 */
-			shared_ptr<Tensor> input_second;
+			shared_ptr<Tensor> input_second = nullptr;
 
 			/**
 			 * Constructor
@@ -67,14 +67,14 @@ namespace ml {
 			/**
 			 * Function to support element indexing.
 			 */
-			double at(vector<int> position) ;
+			double get_element(vector<int> position) ;
 
 			/**
 			 * Function to retrieve matrix based on specified indices into 
 			 * batch (non-matrix) dimensions. All dimensions except for the last two 
 			 * are considered to be batch dimensions.
 			 */
-			vector<vector<double>> get_matrix_at (vector<int> position) const ;
+			vector<vector<double>> get_matrix(vector<int> position) const ;
 
 			/**
 			 * Function to set a matrix contained within the Tensor based on specified
@@ -82,7 +82,12 @@ namespace ml {
 			 * batch (non-matrix) dimensions. All dimensions except for the last two 
 			 * are considered to be batch dimensions.
 			 */
-			void set_matrix_at(vector<int> position, const vector<vector<double>>& matrix) ; 
+			void set_matrix(vector<int> position, const vector<vector<double>>& matrix) ;
+
+			/**
+			 * Function to retrieve gradient matrix for specified position
+			 */
+		       vector<vector<double>> get_gradient(vector<int> position) const ;	
 
 			/**
 			 * Reshape
