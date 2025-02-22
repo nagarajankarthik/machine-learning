@@ -4,6 +4,22 @@ using namespace std;
 
 namespace ml {
 
+	inline void add_backward(const vector<double>& seed, shared_ptr<Tensor> t1, shared_ptr<Tensor> t2) {
+
+		shared_ptr<Logger> logger = t1->logger;
+
+		if (t1->shape != t2->shape) {
+			logger->log(ERROR, "Cannot back-propagate gradients in add_backward: Input Tensors have different shapes");
+			exit(1);
+		}
+
+		for (int i = 0; i < t1->values.size(); i++) {
+			t1->gradients[i] += seed[i];
+			t2->gradients[i] += seed[i];
+		}
+	}
+
+
 	inline Tensor add_forward(const Tensor& t1, const Tensor& t2) {
 
 		shared_ptr<Logger> logger = t1.logger;
@@ -17,7 +33,9 @@ namespace ml {
 			sum_values[i] += t2.values[i];
 		}
 
-		return Tensor(sum_values, t1.shape, logger, t1.input_first, t1.input_second);
+		function<void(const vector<double>&, shared_ptr<Tensor>, shared_ptr<Tensor>)> add_back = add_backward;
+
+		return Tensor(sum_values, t1.shape, logger, make_shared<Tensor>(t1), make_shared<Tensor>(t2), add_back); 
 	}
 
 	inline Tensor elementwise_product_forward(const Tensor& t1, const Tensor& t2) {
@@ -75,18 +93,34 @@ namespace ml {
 		return new_shape;
 	}
 
+	inline vector<vector<double>> matmul(vector<vector<double>> m1, vector<vector<double>> m2, shared_ptr<Logger> logger) {
 
-	inline void recurse_matmul(const vector<int> & new_shape, const Tensor& t1, const Tensor& t2, vector<int> & new_position, vector<double> & new_values, int axis=0) {
+		if (m1[0].size() != m2.size()) {
+			logger->log(ERROR, "Invalid matrix dimensions");
+			exit(1);
+		}
 
-		if (axis == new_shape.size() - 2) {
+		vector<vector<double>> matrix_product(m1.size(), vector<double>(m2[0].size()));
+		for (int i = 0; i < m1.size(); i++) {
+			for (int j = 0; j < m2[0].size(); j++) {
+				double sum = 0;
+				for (int k = 0; k < m2.size(); k++) {
+					sum += m1[i][k]*m2[k][j];
+				}
+				matrix_product[i][j] = sum;
+			}
+		}
+		return matrix_product;
+	}
+
+
+	inline void recurse_matmul(Tensor & t3, const Tensor& t1, const Tensor& t2, vector<int> & new_position, int axis=0) {
+
+		if (axis == t3.shape.size() - 2) {
 			vector<vector<double>> m1 = t1.get_matrix_at(new_position);
 			vector<vector<double>> m2 = t2.get_matrix_at(new_position);
-			vector<vector<double>> matrix_product = matmul(m1, m2);
-			for (int i = 0; i < matrix_product.size(); i++) {
-				for (int j = 0; j < matrix_product[i].size(); j++) {
-					new_values.push_back(matrix_product[i][j]);
-				}
-			}
+			vector<vector<double>> matrix_product = matmul(m1, m2, t1.logger);
+			t3.set_matrix_at(new_position, matrix_product);
 
 			return;
 		}
@@ -94,10 +128,11 @@ namespace ml {
 		new_position.push_back(0);
 		int position_index = new_position.size() - 1;
 
-		for (int i = 0; i < new_shape[axis]; i++) {
+		for (int i = 0; i < t3.shape[axis]; i++) {
 			new_position[position_index] = i;
-			recurse_matmul(new_shape, t1, t2, new_position, new_values, axis+1);
+			recurse_matmul(t3, t1, t2, new_position, axis+1);
 		}
+		new_position.pop_back();
 		
 	}
 
@@ -109,22 +144,13 @@ namespace ml {
 		for (int i = 0; i < new_shape.size(); i++) {
 			new_size *= new_shape[i];
 		}
-		vector<double> new_values(new_size, 0.);
 
-		if (t1.shape[1] != t2.shape[0]) {
-			logger->log(ERROR, "Tensors have different shapes");
-			exit(1);
-		}
-		vector<double> product_values(t1.values.size());
-		for (int i = 0; i < t1.shape[0]; i++) {
-			for (int j = 0; j < t2.shape[1]; j++) {
-				double sum = 0;
-				for (int k = 0; k < t1.shape[1]; k++) {
-					sum += t1.values[i*t1.shape[1] + k] * t2.values[k*t2.shape[1] + j];
-				}
-				product_values[i*t2.shape[1] + j] = sum;
-			}
-		}
-		return Tensor(product_values, {t1.shape[0], t2.shape[1]}, logger, t1.input_first, t1.input_second);
+		Tensor result = Tensor(vector<double>(new_size, 0.), new_shape, logger, make_shared<Tensor>(t1), make_shared<Tensor>(t2));
+
+		vector<int> new_position{};
+		recurse_matmul(result, t1, t2, new_position);
+		return result;
+
 	}
+
 }// namespace ml
