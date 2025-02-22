@@ -136,6 +136,21 @@ namespace ml {
 		
 	}
 
+	inline void batch_matmul_backward(shared_ptr<Tensor> t3) {
+
+		shared_ptr<Tensor> t1 = t3->input_first;
+		if (!t1) return;
+		shared_ptr<Tensor> t2 = t3->input_second;
+
+		shared_ptr<Logger> logger = t1->logger;
+		vector<int> new_shape = get_shape_after_matmul(t1, t2);
+		int new_size = 1;
+		for (int i = 0; i < new_shape.size(); i++) {
+			new_size *= new_shape[i];
+		}
+	}
+
+
 	inline Tensor batch_matmul_forward(const Tensor& t1, const Tensor& t2) {
 
 		shared_ptr<Logger> logger = t1.logger;
@@ -145,12 +160,15 @@ namespace ml {
 			new_size *= new_shape[i];
 		}
 
-		Tensor result = Tensor(vector<double>(new_size, 0.), new_shape, logger, make_shared<Tensor>(t1), make_shared<Tensor>(t2));
+		function<void(const vector<double>&, shared_ptr<Tensor>, shared_ptr<Tensor>)> batch_matmul_back = batch_matmul_backward;
+
+		Tensor result = Tensor(vector<double>(new_size, 0.), new_shape, logger, make_shared<Tensor>(t1), make_shared<Tensor>(t2), batch_matmul_backward);
 
 		vector<int> new_position{};
 		recurse_matmul(result, t1, t2, new_position);
 		return result;
 
 	}
+
 
 }// namespace ml
