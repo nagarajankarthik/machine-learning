@@ -55,6 +55,11 @@ namespace ml {
 			Tensor(vector<double> values, vector<int> shape, shared_ptr<Logger> logger, shared_ptr<Tensor> input_first, shared_ptr<Tensor> input_second);
 
 			/**
+			 * Constructor to assign values, inputs and backward function
+			 */
+			Tensor(vector<double> values, vector<int> shape, shared_ptr<Logger> logger, shared_ptr<Tensor> input_first, shared_ptr<Tensor> input_second, function<void(const vector<double>&, shared_ptr<Tensor>, shared_ptr<Tensor>)> backward_function);
+
+			/**
 			 * Destructor
 			 */
 			~Tensor() {} ;
@@ -69,7 +74,7 @@ namespace ml {
 			 * batch (non-matrix) dimensions. All dimensions except for the last two 
 			 * are considered to be batch dimensions.
 			 */
-			vector<vector<double>> get_matrix_at(vector<int> position) ;
+			vector<vector<double>> get_matrix_at (vector<int> position) const ;
 
 			/**
 			 * Function to set a matrix contained within the Tensor based on specified
