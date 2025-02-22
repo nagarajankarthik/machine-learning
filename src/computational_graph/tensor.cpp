@@ -13,6 +13,12 @@ namespace ml {
 
 	};
 
+	Tensor::Tensor(vector<double> values, vector<int> shape, shared_ptr<Logger> logger, shared_ptr<Tensor> input_first, shared_ptr<Tensor> input_second, function<void(const vector<double>&, shared_ptr<Tensor>, shared_ptr<Tensor>)> backward_function):Tensor(values, shape, logger, input_first, input_second) {
+		this->backward_function = backward_function;
+	};
+
+
+
 	double Tensor::at(vector<int> position) {
 		int index = 0;
 		for (int i = 0; i < shape.size(); i++) {
@@ -21,7 +27,7 @@ namespace ml {
 		return values[index];
 	}
 
-	vector<vector<double>> Tensor::get_matrix_at(vector<int> position) {
+	vector<vector<double>> Tensor::get_matrix_at(vector<int> position) const {
 		if (position.size() != shape.size() - 2) {
 			logger->log(ERROR, "The specified position has " + to_string(position.size()) + " indices, but the tensor has " + to_string(shape.size()) + " dimensions");
 			exit(1);
