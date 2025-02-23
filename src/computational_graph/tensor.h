@@ -3,6 +3,7 @@
 #include <vector>
 #include <list>
 #include <memory>
+#pragma once
 using namespace std;
 
 namespace ml {
