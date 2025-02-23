@@ -66,7 +66,7 @@ namespace ml {
 		vector<int> new_position = broadcast_indices(position);
 
 		int index = 0;
-		for (int i = 0; i < shape.size(); i++) {
+		for (int i = 0; i < new_position.size(); i++) {
 			index += strides[i]*new_position[i];
 		}
 		int number_rows = shape[shape.size() - 2];
@@ -102,7 +102,7 @@ namespace ml {
 		vector<int> new_position = broadcast_indices(position);
 
 		int index = 0;
-		for (int i = 0; i < shape.size(); i++) {
+		for (int i = 0; i < new_position.size(); i++) {
 			index += strides[i]*new_position[i];
 		}
 		int number_rows = shape[shape.size() - 2];
