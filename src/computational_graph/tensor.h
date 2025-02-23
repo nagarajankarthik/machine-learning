@@ -57,7 +57,7 @@ namespace ml {
 			/**
 			 * Constructor to assign values, inputs and backward function
 			 */
-			Tensor(vector<double> values, vector<int> shape, shared_ptr<Logger> logger, shared_ptr<Tensor> input_first, shared_ptr<Tensor> input_second, function<void(const vector<double>&, shared_ptr<Tensor>, shared_ptr<Tensor>)> backward_function);
+			Tensor(vector<double> values, vector<int> shape, shared_ptr<Logger> logger, shared_ptr<Tensor> input_first, shared_ptr<Tensor> input_second, function<void(shared_ptr<Tensor>)> backward_function);
 
 			/**
 			 * Destructor
@@ -74,7 +74,7 @@ namespace ml {
 			 * batch (non-matrix) dimensions. All dimensions except for the last two 
 			 * are considered to be batch dimensions.
 			 */
-			vector<vector<double>> get_matrix(vector<int> position) const ;
+			vector<vector<double>> get_matrix(vector<int> position, string item = "values") const ;
 
 			/**
 			 * Function to set a matrix contained within the Tensor based on specified
@@ -82,12 +82,7 @@ namespace ml {
 			 * batch (non-matrix) dimensions. All dimensions except for the last two 
 			 * are considered to be batch dimensions.
 			 */
-			void set_matrix(vector<int> position, const vector<vector<double>>& matrix) ;
-
-			/**
-			 * Function to retrieve gradient matrix for specified position
-			 */
-		       vector<vector<double>> get_gradient(vector<int> position) const ;	
+			void set_matrix(vector<int> position, const vector<vector<double>>& matrix, string item = "values") ;
 
 			/**
 			 * Reshape
@@ -97,7 +92,7 @@ namespace ml {
 			/**
 			 * Back-propagate gradients to input Tensors
 			 */
-			void backward(const vector<double> & seed) ;
+			void backward() ;
 		private:
 
 			/**
@@ -111,9 +106,14 @@ namespace ml {
 			void update_strides() ;
 
 			/**
+			 * Update indices to account for broadcasting
+			 */
+			vector<int> broadcast_indices(vector<int> position) const ;
+
+			/**
 			 * Pointer to gradient function
 			 */
-			std::function<void(const vector<double> &, shared_ptr<Tensor>, shared_ptr<Tensor>)> backward_function ;
+			std::function<void(shared_ptr<Tensor>)> backward_function ;
 
 	};
 }// namespace ml
