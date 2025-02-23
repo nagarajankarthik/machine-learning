@@ -3,6 +3,8 @@
 namespace ml {
 	Tensor::Tensor(vector<double> values, vector<int> shape, shared_ptr<Logger> logger):values(values), shape(shape), logger(logger) {
 		update_strides();
+		gradients.resize(values.size());
+		fill(gradients.begin(), gradients.end(), 0.);
 	
 	} ;
 
@@ -13,7 +15,7 @@ namespace ml {
 
 	};
 
-	Tensor::Tensor(vector<double> values, vector<int> shape, shared_ptr<Logger> logger, shared_ptr<Tensor> input_first, shared_ptr<Tensor> input_second, function<void(const vector<double>&, shared_ptr<Tensor>, shared_ptr<Tensor>)> backward_function):Tensor(values, shape, logger, input_first, input_second) {
+	Tensor::Tensor(vector<double> values, vector<int> shape, shared_ptr<Logger> logger, shared_ptr<Tensor> input_first, shared_ptr<Tensor> input_second, function<void(shared_ptr<Tensor>)> backward_function):Tensor(values, shape, logger, input_first, input_second) {
 		this->backward_function = backward_function;
 	};
 
@@ -27,14 +29,7 @@ namespace ml {
 		return values[index];
 	}
 
-	vector<vector<double>> Tensor::get_matrix(vector<int> position) const {
-		if (position.size() < shape.size() - 2) {
-			logger->log(ERROR, "The specified position has " + to_string(position.size()) + " indices, but the tensor has " + to_string(shape.size()) + " dimensions");
-			exit(1);
-		}
-
-		// TODO: Move this to a separate function
-		// allow for broadcasting
+	vector<int> Tensor::broadcast_indices(vector<int> position) const {
 		list<int> position_list(position.begin(), position.end());
 		while(position_list.size() > shape.size() - 2) {
 			position_list.pop_front();
@@ -57,7 +52,18 @@ namespace ml {
 				}
 			}
 		}
-		// end of broadcasting logic. 
+
+		return new_position;
+	}
+
+	vector<vector<double>> Tensor::get_matrix(vector<int> position, string item) const {
+		if (position.size() < shape.size() - 2) {
+			logger->log(ERROR, "The specified position has " + to_string(position.size()) + " indices, but the tensor has " + to_string(shape.size()) + " dimensions");
+			exit(1);
+		}
+
+		// allow for broadcasting
+		vector<int> new_position = broadcast_indices(position);
 
 		int index = 0;
 		for (int i = 0; i < shape.size(); i++) {
@@ -68,23 +74,36 @@ namespace ml {
 		vector<double> tmp(*shape.rbegin(), 0.);
 		vector<vector<double>> matrix(*(++shape.rbegin()), tmp);
 
-		for (int i = 0; i < number_rows; i++) {
-			for (int j = 0; j < number_cols; j++) {
-				matrix[i][j] = values[index + i*number_cols + j];
+		if (item == "values") {
+			for (int i = 0; i < number_rows; i++) {
+				for (int j = 0; j < number_cols; j++) {
+					matrix[i][j] = values[index + i*number_cols + j];
+				}
+			}
+		} else if (item == "gradients") {
+			for (int i = 0; i < number_rows; i++) {
+				for (int j = 0; j < number_cols; j++) {
+					matrix[i][j] = gradients[index + i*number_cols + j];
+				}
 			}
 		}
+
 		return matrix;
 	}
 
-	void Tensor::set_matrix(vector<int> position,const vector<vector<double>>& matrix) {
-		if (position.size() != shape.size() - 2) {
+	void Tensor::set_matrix(vector<int> position,const vector<vector<double>>& matrix, string item) {
+		if (position.size() < shape.size() - 2) {
 			logger->log(ERROR, "The specified position has " + to_string(position.size()) + " indices, but the tensor has " + to_string(shape.size()) + " dimensions");
 			exit(1);
 		}
 
+
+		// allow for broadcasting
+		vector<int> new_position = broadcast_indices(position);
+
 		int index = 0;
 		for (int i = 0; i < shape.size(); i++) {
-			index += strides[i]*position[i];
+			index += strides[i]*new_position[i];
 		}
 		int number_rows = shape[shape.size() - 2];
 		int number_cols = shape[shape.size() - 1];
@@ -94,11 +113,21 @@ namespace ml {
 			exit(1);
 		}
 
-		for (int i = 0; i < number_rows; i++) {
+		if (item == "values") {
+		   for (int i = 0; i < number_rows; i++) {
 			for (int j = 0; j < number_cols; j++) {
 				values[index + i*number_cols + j] = matrix[i][j];
 			}
+		   }
+		} else if (item == "gradients") {
+			for (int i = 0; i < number_rows; i++) {
+				for (int j = 0; j < number_cols; j++) {
+					gradients[index + i*number_cols + j] = matrix[i][j];
+				}
+			}
 		}
+
+
 	}
 
 
@@ -124,8 +153,11 @@ namespace ml {
 		} else logger->log(ERROR, "Reshape error: new size does not match current size");
 	}
 
-	void Tensor::backward(const vector<double>& seed) {
-		backward_function(seed, input_first, input_second);
+	void Tensor::backward() {
+		if (!input_first) return;
+		backward_function(make_shared<Tensor>(this));
+		input_first->backward();
+		input_second->backward();
 	}
 
 
