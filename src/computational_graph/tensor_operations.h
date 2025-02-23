@@ -236,9 +236,9 @@ namespace ml {
 
 	}
 
-	inline void recurse_matmul_forward(shared_ptr<Tensor> t3, const shared_ptr<Tensor> t1, const shared_ptr<Tensor> t2, vector<int> & new_position, int axis=0) {
+	inline void recurse_matmul_forward(shared_ptr<Tensor> t3, const shared_ptr<Tensor> t1, const shared_ptr<Tensor> t2, vector<int> & new_position, int axis=-1) {
 
-		if (axis == t3->shape.size() - 2) {
+		if (axis == t3->shape.size() - 3) {
 			vector<vector<double>> m1 = t1->get_matrix(new_position);
 			vector<vector<double>> m2 = t2->get_matrix(new_position);
 			vector<vector<double>> matrix_product = matmul(m1, m2, t1->logger);
