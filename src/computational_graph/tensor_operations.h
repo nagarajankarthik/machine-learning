@@ -133,8 +133,9 @@ namespace ml {
 		function<void(shared_ptr<Tensor>)> add_back = add_batch_backward;
 		Tensor result = Tensor(sum_values, new_shape, logger, t1, t2, add_batch_backward);
 		vector<int> new_position{};
-		recurse_add_forward(make_shared<Tensor>(result), t1, t2, new_position);
-		return make_shared<Tensor>(result);
+		shared_ptr<Tensor> t3 = shared_ptr<Tensor>(&result);
+		recurse_add_forward(t3, t1, t2, new_position);
+		return t3;
 
 	}
 
@@ -270,8 +271,9 @@ namespace ml {
 		Tensor result = Tensor(vector<double>(new_size, 0.), new_shape, logger, t1, t2, batch_matmul_backward);
 
 		vector<int> new_position{};
-		recurse_matmul_forward(make_shared<Tensor>(result), t1, t2, new_position);
-		return make_shared<Tensor>(result);
+		shared_ptr<Tensor> t3 = shared_ptr<Tensor>(&result);
+		recurse_matmul_forward(t3, t1, t2, new_position);
+		return t3;
 
 	}
 
