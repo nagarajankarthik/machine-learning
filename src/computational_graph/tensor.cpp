@@ -155,7 +155,7 @@ namespace ml {
 
 	void Tensor::backward() {
 		if (!input_first) return;
-		backward_function(shared_ptr<Tensor>(this));
+		backward_function(shared_from_this());
 		input_first->backward();
 		input_second->backward();
 	}
