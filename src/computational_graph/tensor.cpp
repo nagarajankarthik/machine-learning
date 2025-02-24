@@ -122,7 +122,7 @@ namespace ml {
 		} else if (item == "gradients") {
 			for (int i = 0; i < number_rows; i++) {
 				for (int j = 0; j < number_cols; j++) {
-					gradients[index + i*number_cols + j] = matrix[i][j];
+					gradients[index + i*number_cols + j] += matrix[i][j];
 				}
 			}
 		}
