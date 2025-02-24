@@ -7,7 +7,7 @@
 using namespace std;
 
 namespace ml {
-	class Tensor {
+	class Tensor: public enable_shared_from_this<Tensor> {
 
 		public:
 			/**
