@@ -448,42 +448,45 @@ namespace ml {
 	// Loss functions
 	
 
-	inline void recurse_cross_entropy_backward(const shared_ptr<Tensor> t3, shared_ptr<Tensor> t1, vector<int> & new_position, int axis=0) {
+	inline void recurse_cross_entropy_backward(shared_ptr<Tensor> predicted, const shared_ptr<Tensor> ground_truth, vector<int> & new_position, int axis=0) {
 
-		if (axis == t3->shape.size() - 2) {
-			vector<vector<double>> g3 = t3->get_matrix(new_position, "gradients");
-			vector<vector<double>> m1 = t1->get_matrix(new_position);
-			vector<vector<double>> gradient_values_product = elementwise_multiplication(g3, m1, t1->logger);
-			vector<double> gradient_values_product_sum = matrix_col_sum(gradient_values_product);
+		if (axis == predicted->shape.size() - 2) {
+			vector<vector<double>> predicted_values = predicted->get_matrix(new_position);
+			vector<vector<double>> ground_truth_values = ground_truth->get_matrix(new_position);
 
-			vector<vector<double>> g1(g3.size(), vector<double>(g3[0].size(), 0.));
-			for (int j = 0; j < g1[0].size(); j++) {
-				for (int i = 0; i < g1.size(); i++) {
-					g1[i][j] = m1[i][j] * (g3[i][j] - gradient_values_product_sum[j]);
+			vector<vector<double>> loss_gradient(predicted_values.size(), vector<double>(predicted_values[0].size(), 0.));
+
+			for (int j = 0; j < predicted_values[0].size(); j++) {
+				for (int i = 0; i < predicted_values.size(); i++) {
+					loss_gradient[i][j] = -1.0*ground_truth_values[i][j] / predicted_values[i][j] ;
 				}
 			}
-			t1->set_matrix(new_position, g1, "gradients");
+			predicted->set_matrix(new_position, loss_gradient, "gradients");
 			return;
 		}
+
+
+
 
 		new_position.push_back(0);
 		int position_index = new_position.size() - 1;
 
-		for (int i = 0; i < t3->shape[axis]; i++) {
+		for (int i = 0; i < predicted->shape[axis]; i++) {
 			new_position[position_index] = i;
-			recurse_softmax_backward(t3, t1, new_position, axis+1);
+			recurse_cross_entropy_backward(predicted, ground_truth, new_position, axis+1);
 		}
 		new_position.pop_back();
 		
 	}
 
 
-	inline void cross_entropy_backward(shared_ptr<Tensor> t3) {
+	inline void cross_entropy_backward(shared_ptr<Tensor> loss) {
 
-		shared_ptr<Tensor> t1 = t3->input_first;
-		if (!t1) return;
+		shared_ptr<Tensor> predicted = loss->input_first;
+		if (!predicted) return;
+		shared_ptr<Tensor> ground_truth = loss->input_second;
 		vector<int> new_position {};
-		recurse_softmax_backward(t3, t1, new_position);
+		recurse_cross_entropy_backward(predicted, ground_truth, new_position);
 	}
 
 	
@@ -545,12 +548,46 @@ namespace ml {
 		}
 
 		vector<double> loss_values(number_elements, 0.);
-		shared_ptr<Tensor> loss = make_shared<Tensor>(loss_values, loss_shape, logger, predicted, ground_truth, recurse_cross_entropy_backward);
+		shared_ptr<Tensor> loss = make_shared<Tensor>(loss_values, loss_shape, logger, predicted, ground_truth, cross_entropy_backward);
 		vector<int> new_position {};
 		recurse_cross_entropy_forward(loss, predicted, ground_truth, new_position);
 		return loss;
 	}
 
+	inline void mean_squared_error_backward(shared_ptr<Tensor> loss) {
+		shared_ptr<Tensor> predicted = loss -> input_first;
+		shared_ptr<Tensor> ground_truth = loss -> input_second;
+
+		for (int i = 0; i < predicted->values.size(); i++) {
+			predicted->gradients[i] += 2.0 * (predicted->values[i] - ground_truth->values[i]);
+		} 
+
+	}
+
+
+	inline shared_ptr<Tensor> mean_squared_error_forward(shared_ptr<Tensor> predicted, shared_ptr<Tensor> ground_truth) {
+		shared_ptr<Logger> logger = predicted ->logger;
+		if (predicted->shape != ground_truth->shape) {
+			logger->log(ERROR, "The shapes of the predicted and ground truth arrays are mismatched in mean_squared_error_forward.");
+			exit(1);
+		}
+
+		vector<int> loss_shape = predicted->shape;
+
+		int number_elements = 1;
+		for (int i = 0; i < loss_shape.size(); i++) {
+			number_elements *= loss_shape[i];
+		}
+
+		vector<double> loss_values(number_elements, 0.);
+
+		for (int i = 0; i < number_elements; i++) 
+			loss_values[i] = (predicted->values[i] - ground_truth->values[i]) * (predicted->values[i] - ground_truth->values[i]);
+
+
+		shared_ptr<Tensor> loss = make_shared<Tensor>(loss_values, loss_shape, logger, predicted, ground_truth, mean_squared_error_backward);
+		return loss;
+	}
 
 
 
