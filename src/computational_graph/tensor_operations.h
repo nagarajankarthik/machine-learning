@@ -276,16 +276,6 @@ namespace ml {
 	}
 
 	// Activation functions
-
-	inline shared_ptr<Tensor> relu_forward(shared_ptr<Tensor> t1) {
-		shared_ptr<Logger> logger = t1->logger;
-		shared_ptr<Tensor> t2 = make_shared<Tensor>(vector<double>(t1->values.size(), 0.), t1->shape, logger, t1);
-		for (int i = 0; i < t1->values.size(); i++) {
-			t2->values[i] = max(0., t1->values[i]);
-		}
-		return t2;
-	}
-
 	inline void relu_backward(shared_ptr<Tensor> t3) {
 
 		shared_ptr<Tensor> t1 = t3->input_first;
@@ -295,13 +285,13 @@ namespace ml {
 		}
 	}
 
-	inline shared_ptr<Tensor> sigmoid_forward(shared_ptr<Tensor> t1) {
+	inline shared_ptr<Tensor> relu_forward(shared_ptr<Tensor> t1) {
 		shared_ptr<Logger> logger = t1->logger;
-		shared_ptr<Tensor> t2 = make_shared<Tensor>(vector<double>(t1->values.size(), 0.), t1->shape, logger, t1);
+		shared_ptr<Tensor> t3 = make_shared<Tensor>(vector<double>(t1->values.size(), 0.), t1->shape, logger, t1, nullptr, relu_backward);
 		for (int i = 0; i < t1->values.size(); i++) {
-			t2->values[i] = 1. / (1. + exp(-t1->values[i])); 
+			t3->values[i] = max(0., t1->values[i]);
 		}
-		return t2;
+		return t3;
 	}
 
 	inline void sigmoid_backward(shared_ptr<Tensor> t3) {
@@ -314,14 +304,13 @@ namespace ml {
 		}
 	}
 
-
-	inline shared_ptr<Tensor> tanh_forward(shared_ptr<Tensor> t1) {
+	inline shared_ptr<Tensor> sigmoid_forward(shared_ptr<Tensor> t1) {
 		shared_ptr<Logger> logger = t1->logger;
-		shared_ptr<Tensor> t2 = make_shared<Tensor>(vector<double>(t1->values.size(), 0.), t1->shape, logger, t1);
+		shared_ptr<Tensor> t3 = make_shared<Tensor>(vector<double>(t1->values.size(), 0.), t1->shape, logger, t1, nullptr, sigmoid_backward);
 		for (int i = 0; i < t1->values.size(); i++) {
-			t2->values[i] = tanh(t1->values[i]); 
+			t3->values[i] = 1. / (1. + exp(-t1->values[i])); 
 		}
-		return t2;
+		return t3;
 	}
 
 	inline void tanh_backward(shared_ptr<Tensor> t3) {
@@ -334,46 +323,13 @@ namespace ml {
 		}
 	}
 
-	inline vector<vector<double>> evaluate_softmax(const vector<vector<double>> & m1, shared_ptr<Logger> logger) {
-		vector<vector<double>> softmax_result (m1.size(), vector<double>(m1[0].size(), 0.));
-		for (int j = 0; j < m1[0].size(); j++) {
-			double sum = 0.;
-			for (int i = 0; i < m1.size(); i++) {
-				softmax_result[i][j] = exp(m1[i][j]);
-				sum += softmax_result[i][j];
-			}
-			for (int i = 0; i < m1.size(); i++) {
-				softmax_result[i][j] /= sum;
-			}
-		}
-		return softmax_result;
-	}
 
-	inline void recurse_softmax_forward(shared_ptr<Tensor> t3, const shared_ptr<Tensor> t1, vector<int> & new_position, int axis=0) {
-
-		if (axis == t3->shape.size() - 2) {
-			vector<vector<double>> m1 = t1->get_matrix(new_position);
-			vector<vector<double>> softmax_result = evaluate_softmax(m1, t1->logger);
-			t3->set_matrix(new_position, softmax_result);
-			return;
-		}
-
-		new_position.push_back(0);
-		int position_index = new_position.size() - 1;
-
-		for (int i = 0; i < t3->shape[axis]; i++) {
-			new_position[position_index] = i;
-			recurse_softmax_forward(t3, t1, new_position, axis+1);
-		}
-		new_position.pop_back();
-
-	}
-
-	inline shared_ptr<Tensor> softmax_forward(shared_ptr<Tensor> t1) {
+	inline shared_ptr<Tensor> tanh_forward(shared_ptr<Tensor> t1) {
 		shared_ptr<Logger> logger = t1->logger;
-		shared_ptr<Tensor> t3 = make_shared<Tensor>(vector<double>(t1->values.size(), 0.), t1->shape, logger, t1);
-		vector<int> new_position {};
-		recurse_softmax_forward(t3, t1, new_position);
+		shared_ptr<Tensor> t3 = make_shared<Tensor>(vector<double>(t1->values.size(), 0.), t1->shape, logger, t1, nullptr, tanh_backward);
+		for (int i = 0; i < t1->values.size(); i++) {
+			t3->values[i] = tanh(t1->values[i]); 
+		}
 		return t3;
 	}
 
@@ -444,7 +400,94 @@ namespace ml {
 		recurse_softmax_backward(t3, t1, new_position);
 	}
 
+
+	inline vector<vector<double>> evaluate_softmax(const vector<vector<double>> & m1, shared_ptr<Logger> logger) {
+		vector<vector<double>> softmax_result (m1.size(), vector<double>(m1[0].size(), 0.));
+		for (int j = 0; j < m1[0].size(); j++) {
+			double sum = 0.;
+			for (int i = 0; i < m1.size(); i++) {
+				softmax_result[i][j] = exp(m1[i][j]);
+				sum += softmax_result[i][j];
+			}
+			for (int i = 0; i < m1.size(); i++) {
+				softmax_result[i][j] /= sum;
+			}
+		}
+		return softmax_result;
+	}
+
+	inline void recurse_softmax_forward(shared_ptr<Tensor> t3, const shared_ptr<Tensor> t1, vector<int> & new_position, int axis=0) {
+
+		if (axis == t3->shape.size() - 2) {
+			vector<vector<double>> m1 = t1->get_matrix(new_position);
+			vector<vector<double>> softmax_result = evaluate_softmax(m1, t1->logger);
+			t3->set_matrix(new_position, softmax_result);
+			return;
+		}
+
+		new_position.push_back(0);
+		int position_index = new_position.size() - 1;
+
+		for (int i = 0; i < t3->shape[axis]; i++) {
+			new_position[position_index] = i;
+			recurse_softmax_forward(t3, t1, new_position, axis+1);
+		}
+		new_position.pop_back();
+
+	}
+
+	inline shared_ptr<Tensor> softmax_forward(shared_ptr<Tensor> t1) {
+		shared_ptr<Logger> logger = t1->logger;
+		shared_ptr<Tensor> t3 = make_shared<Tensor>(vector<double>(t1->values.size(), 0.), t1->shape, logger, t1, nullptr, softmax_backward);
+		vector<int> new_position {};
+		recurse_softmax_forward(t3, t1, new_position);
+		return t3;
+	}
+
+
 	// Loss functions
+	
+
+	inline void recurse_cross_entropy_backward(const shared_ptr<Tensor> t3, shared_ptr<Tensor> t1, vector<int> & new_position, int axis=0) {
+
+		if (axis == t3->shape.size() - 2) {
+			vector<vector<double>> g3 = t3->get_matrix(new_position, "gradients");
+			vector<vector<double>> m1 = t1->get_matrix(new_position);
+			vector<vector<double>> gradient_values_product = elementwise_multiplication(g3, m1, t1->logger);
+			vector<double> gradient_values_product_sum = matrix_col_sum(gradient_values_product);
+
+			vector<vector<double>> g1(g3.size(), vector<double>(g3[0].size(), 0.));
+			for (int j = 0; j < g1[0].size(); j++) {
+				for (int i = 0; i < g1.size(); i++) {
+					g1[i][j] = m1[i][j] * (g3[i][j] - gradient_values_product_sum[j]);
+				}
+			}
+			t1->set_matrix(new_position, g1, "gradients");
+			return;
+		}
+
+		new_position.push_back(0);
+		int position_index = new_position.size() - 1;
+
+		for (int i = 0; i < t3->shape[axis]; i++) {
+			new_position[position_index] = i;
+			recurse_softmax_backward(t3, t1, new_position, axis+1);
+		}
+		new_position.pop_back();
+		
+	}
+
+
+	inline void cross_entropy_backward(shared_ptr<Tensor> t3) {
+
+		shared_ptr<Tensor> t1 = t3->input_first;
+		if (!t1) return;
+		vector<int> new_position {};
+		recurse_softmax_backward(t3, t1, new_position);
+	}
+
+	
+	
 	
 	inline vector<double> evaluate_cross_entropy(vector<vector<double>> predicted, vector<vector<double>> ground_truth, shared_ptr<Logger> logger) {
 		if (predicted.size() != ground_truth.size() || predicted[0].size() != ground_truth[0].size()) {
@@ -502,13 +545,13 @@ namespace ml {
 		}
 
 		vector<double> loss_values(number_elements, 0.);
-		shared_ptr<Tensor> loss = make_shared<Tensor>(loss_values, loss_shape, logger, predicted, ground_truth);
+		shared_ptr<Tensor> loss = make_shared<Tensor>(loss_values, loss_shape, logger, predicted, ground_truth, recurse_cross_entropy_backward);
 		vector<int> new_position {};
 		recurse_cross_entropy_forward(loss, predicted, ground_truth, new_position);
 		return loss;
 	}
 
-	
+
 
 
 }// namespace ml
