@@ -446,13 +446,31 @@ namespace ml {
 
 	// Loss functions
 	
+	inline vector<double> evaluate_cross_entropy(vector<vector<double>> predicted, vector<vector<double>> ground_truth, shared_ptr<Logger> logger) {
+		if (predicted.size() != ground_truth.size() || predicted[0].size() != ground_truth[0].size()) {
+			logger->log(ERROR, "Matrix dimensions do not match in evaluate_cross_entropy.");
+			exit(1);
+		}
+		vector<double> loss(predicted[0].size(), 0.);
+		for (int j = 0; j < predicted[0].size(); j++) {
+			double cross_entropy = 0.;
+			for (int i = 0; i < predicted.size(); i++) {
+				cross_entropy += ground_truth[i][j] * log(predicted[i][j]);
+			}
+			loss[j] = -cross_entropy;
+		}
+		return loss;
+	}
+	 
+	
 	inline void recurse_cross_entropy_forward(shared_ptr<Tensor> loss, const shared_ptr<Tensor> predicted, const shared_ptr<Tensor> ground_truth, vector<int> & new_position, int axis=0) {
 
 		if (axis == loss->shape.size() - 2) {
 			vector<vector<double>> m1 = predicted->get_matrix(new_position);
 			vector<vector<double>> m2 = ground_truth->get_matrix(new_position);
-			double loss_value = evaluate_cross_entropy(m1, m2, predicted->logger);
-			loss->set_matrix(new_position, vector<vector<double>>(1, vector<double>(1, loss_value)));
+			vector<double> cross_entropy_loss = evaluate_cross_entropy(m1, m2, predicted->logger);
+			vector<vector<double>> result {cross_entropy_loss};
+			loss->set_matrix(new_position, result, "values");
 			return;
 		}
 
