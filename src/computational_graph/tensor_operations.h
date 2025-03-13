@@ -275,6 +275,31 @@ namespace ml {
 
 	}
 
+	inline shared_ptr<Tensor> concatenate_forward(shared_ptr<Tensor> t1, shared_ptr<Tensor> t2, int concat_dim = 0) {
+		vector<int> first_shape = t1->shape;
+		vector<int> second_shape = t2->shape;
+		shared_ptr<Logger> logger = t1->logger;
+
+		if (first_shape.size() != second_shape.size()) {
+			logger->log(ERROR, "Error in concatenate_forward: Input Tensors have different shapes.");
+			exit(1);
+		}
+
+		for (int i = 0; i < first_shape.size(); i++) {
+			if (i != concat_dim && first_shape[i] != second_shape[i]) {
+				logger->log(ERROR, "Error in concatenate_forward: Input Tensors have different shapes along dimension " + to_string(i) + ".");
+				logger->log(ERROR, "Concatenation dimension is " + to_string(concat_dim) + ".");
+				exit(1);
+			}
+		}
+
+		vector<int> new_shape = first_shape;
+		new_shape[concat_dim] += second_shape[concat_dim];
+		int new_size = t1->values.size() + t2->values.size();
+		shared_ptr<Tensor> t3 = make_shared<Tensor>(vector<double>(new_size, 0.), new_shape, logger, t1, t2, concatenate_backward);
+		
+	}
+
 	// Activation functions
 	inline void relu_backward(shared_ptr<Tensor> t3) {
 
