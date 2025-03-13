@@ -1,5 +1,5 @@
 #include "tensor.h"
-#include "../utils/logging.h"
+#include <math.h>
 using namespace std;
 
 namespace ml {
@@ -273,6 +273,172 @@ namespace ml {
 		recurse_matmul_forward(t3, t1, t2, new_position);
 		return t3;
 
+	}
+
+	// Activation functions
+
+	inline shared_ptr<Tensor> relu_forward(shared_ptr<Tensor> t1) {
+		shared_ptr<Logger> logger = t1->logger;
+		shared_ptr<Tensor> t2 = make_shared<Tensor>(vector<double>(t1->values.size(), 0.), t1->shape, logger, t1);
+		for (int i = 0; i < t1->values.size(); i++) {
+			t2->values[i] = max(0., t1->values[i]);
+		}
+		return t2;
+	}
+
+	inline void relu_backward(shared_ptr<Tensor> t3) {
+
+		shared_ptr<Tensor> t1 = t3->input_first;
+		if (!t1) return;
+		for (int i = 0; i < t1->values.size(); i++) {
+			t1->gradients[i] = t3->values[i] > 0. ? t3->gradients[i] : 0.;
+		}
+	}
+
+	inline shared_ptr<Tensor> sigmoid_forward(shared_ptr<Tensor> t1) {
+		shared_ptr<Logger> logger = t1->logger;
+		shared_ptr<Tensor> t2 = make_shared<Tensor>(vector<double>(t1->values.size(), 0.), t1->shape, logger, t1);
+		for (int i = 0; i < t1->values.size(); i++) {
+			t2->values[i] = 1. / (1. + exp(-t1->values[i])); 
+		}
+		return t2;
+	}
+
+	inline void sigmoid_backward(shared_ptr<Tensor> t3) {
+
+		shared_ptr<Tensor> t1 = t3->input_first;
+		if (!t1) return;
+		for (int i = 0; i < t1->values.size(); i++) {
+			int function_result = t3->values[i] ;
+			t1->gradients[i] = function_result * (1. - function_result) * t3->gradients[i]; 
+		}
+	}
+
+
+	inline shared_ptr<Tensor> tanh_forward(shared_ptr<Tensor> t1) {
+		shared_ptr<Logger> logger = t1->logger;
+		shared_ptr<Tensor> t2 = make_shared<Tensor>(vector<double>(t1->values.size(), 0.), t1->shape, logger, t1);
+		for (int i = 0; i < t1->values.size(); i++) {
+			t2->values[i] = tanh(t1->values[i]); 
+		}
+		return t2;
+	}
+
+	inline void tanh_backward(shared_ptr<Tensor> t3) {
+
+		shared_ptr<Tensor> t1 = t3->input_first;
+		if (!t1) return;
+		for (int i = 0; i < t1->values.size(); i++) {
+			int function_result = t3->values[i] ;
+			t1->gradients[i] = (1. - function_result*function_result) * t3->gradients[i]; 
+		}
+	}
+
+	inline vector<vector<double>> evaluate_softmax(const vector<vector<double>> & m1, shared_ptr<Logger> logger) {
+		vector<vector<double>> softmax_result = m1;
+		double sum = 0.;
+		for (int i = 0; i < m1.size(); i++) {
+			for (int j = 0; j < m1[i].size(); j++) {
+				softmax_result[i][j] = exp(m1[i][j]);
+				sum += softmax_result[i][j];
+			}
+		}
+		for (int i = 0; i < m1.size(); i++) {
+			for (int j = 0; j < m1[i].size(); j++) {
+				softmax_result[i][j] /= sum;
+			}
+		}
+		return softmax_result;
+	}
+
+	inline void recurse_softmax_forward(shared_ptr<Tensor> t3, const shared_ptr<Tensor> t1, vector<int> & new_position, int axis=0) {
+
+		if (axis == t3->shape.size() - 2) {
+			vector<vector<double>> m1 = t1->get_matrix(new_position);
+			vector<vector<double>> softmax_result = evaluate_softmax(m1, t1->logger);
+			t3->set_matrix(new_position, softmax_result);
+			return;
+		}
+
+		new_position.push_back(0);
+		int position_index = new_position.size() - 1;
+
+		for (int i = 0; i < t3->shape[axis]; i++) {
+			new_position[position_index] = i;
+			recurse_softmax_forward(t3, t1, new_position, axis+1);
+		}
+		new_position.pop_back();
+
+	}
+
+	inline shared_ptr<Tensor> softmax_forward(shared_ptr<Tensor> t1) {
+		shared_ptr<Logger> logger = t1->logger;
+		shared_ptr<Tensor> t3 = make_shared<Tensor>(vector<double>(t1->values.size(), 0.), t1->shape, logger, t1);
+		vector<int> new_position {};
+		recurse_softmax_forward(t3, t1, new_position);
+		return t3;
+	}
+
+	inline vector<vector<double>> elementwise_multiplication(vector<vector<double>> m1, vector<vector<double>> m2, shared_ptr<Logger> logger) {
+		if (m1.size() != m2.size() || m1[0].size() != m2[0].size()) {
+			logger->log(ERROR, "Matrix dimensions do not match in elementwise_multiplication.");
+			exit(1);
+		}
+		vector<vector<double>> result(m1.size(), vector<double>(m1[0].size(), 0.));
+		for (int i = 0; i < m1.size(); i++) {
+			for (int j = 0; j < m1[0].size(); j++) {
+				result[i][j] = m1[i][j] * m2[i][j];
+			}
+		}
+		return result;
+	}
+
+	inline double matrix_sum(vector<vector<double>> m1) {
+		double sum = 0.;
+		for (int i = 0; i < m1.size(); i++) {
+			for (int j = 0; j < m1[0].size(); j++) {
+				sum += m1[i][j];
+			}
+		}
+		return sum;
+	}
+
+	inline void recurse_softmax_backward(const shared_ptr<Tensor> t3, shared_ptr<Tensor> t1, vector<int> & new_position, int axis=0) {
+
+		if (axis == t3->shape.size() - 2) {
+			vector<vector<double>> g3 = t3->get_matrix(new_position, "gradients");
+			vector<vector<double>> m1 = t1->get_matrix(new_position);
+			vector<vector<double>> gradient_values_product = elementwise_multiplication(g3, m1, t1->logger);
+			double gradient_values_product_sum = matrix_sum(gradient_values_product);
+
+			vector<vector<double>> g1(g3.size(), vector<double>(g3[0].size(), 0.));
+			for (int i = 0; i < g1.size(); i++) {
+				for (int j = 0; j < g1[0].size(); j++) {
+					g1[i][j] = m1[i][j] * (g3[i][j] - gradient_values_product_sum);
+				}
+			}
+			t1->set_matrix(new_position, g1, "gradients");
+			return;
+		}
+
+		new_position.push_back(0);
+		int position_index = new_position.size() - 1;
+
+		for (int i = 0; i < t3->shape[axis]; i++) {
+			new_position[position_index] = i;
+			recurse_softmax_backward(t3, t1, new_position, axis+1);
+		}
+		new_position.pop_back();
+		
+	}
+
+
+	inline void softmax_backward(shared_ptr<Tensor> t3) {
+
+		shared_ptr<Tensor> t1 = t3->input_first;
+		if (!t1) return;
+		vector<int> new_position {};
+		recurse_softmax_backward(t3, t1, new_position);
 	}
 
 
