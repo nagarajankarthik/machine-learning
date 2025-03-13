@@ -335,16 +335,14 @@ namespace ml {
 	}
 
 	inline vector<vector<double>> evaluate_softmax(const vector<vector<double>> & m1, shared_ptr<Logger> logger) {
-		vector<vector<double>> softmax_result = m1;
-		double sum = 0.;
-		for (int i = 0; i < m1.size(); i++) {
-			for (int j = 0; j < m1[i].size(); j++) {
+		vector<vector<double>> softmax_result (m1.size(), vector<double>(m1[0].size(), 0.));
+		for (int j = 0; j < m1[0].size(); j++) {
+			double sum = 0.;
+			for (int i = 0; i < m1.size(); i++) {
 				softmax_result[i][j] = exp(m1[i][j]);
 				sum += softmax_result[i][j];
 			}
-		}
-		for (int i = 0; i < m1.size(); i++) {
-			for (int j = 0; j < m1[i].size(); j++) {
+			for (int i = 0; i < m1.size(); i++) {
 				softmax_result[i][j] /= sum;
 			}
 		}
@@ -393,14 +391,19 @@ namespace ml {
 		return result;
 	}
 
-	inline double matrix_sum(vector<vector<double>> m1) {
-		double sum = 0.;
-		for (int i = 0; i < m1.size(); i++) {
-			for (int j = 0; j < m1[0].size(); j++) {
-				sum += m1[i][j];
+	/**
+	 * Returns the sum of the values in each column of the input matrix.
+	 */
+	inline vector<double> matrix_col_sum(vector<vector<double>> matrix) {
+		vector<double> result(matrix[0].size(), 0.);
+		for (int j = 0; j < matrix[0].size(); j++) {
+			double sum = 0.;
+			for (int i = 0; i < matrix.size(); i++) {
+				sum += matrix[i][j];
 			}
+			result[j] = sum;
 		}
-		return sum;
+		return result;
 	}
 
 	inline void recurse_softmax_backward(const shared_ptr<Tensor> t3, shared_ptr<Tensor> t1, vector<int> & new_position, int axis=0) {
@@ -409,12 +412,12 @@ namespace ml {
 			vector<vector<double>> g3 = t3->get_matrix(new_position, "gradients");
 			vector<vector<double>> m1 = t1->get_matrix(new_position);
 			vector<vector<double>> gradient_values_product = elementwise_multiplication(g3, m1, t1->logger);
-			double gradient_values_product_sum = matrix_sum(gradient_values_product);
+			vector<double> gradient_values_product_sum = matrix_col_sum(gradient_values_product);
 
 			vector<vector<double>> g1(g3.size(), vector<double>(g3[0].size(), 0.));
-			for (int i = 0; i < g1.size(); i++) {
-				for (int j = 0; j < g1[0].size(); j++) {
-					g1[i][j] = m1[i][j] * (g3[i][j] - gradient_values_product_sum);
+			for (int j = 0; j < g1[0].size(); j++) {
+				for (int i = 0; i < g1.size(); i++) {
+					g1[i][j] = m1[i][j] * (g3[i][j] - gradient_values_product_sum[j]);
 				}
 			}
 			t1->set_matrix(new_position, g1, "gradients");
@@ -440,6 +443,54 @@ namespace ml {
 		vector<int> new_position {};
 		recurse_softmax_backward(t3, t1, new_position);
 	}
+
+	// Loss functions
+	
+	inline void recurse_cross_entropy_forward(shared_ptr<Tensor> loss, const shared_ptr<Tensor> predicted, const shared_ptr<Tensor> ground_truth, vector<int> & new_position, int axis=0) {
+
+		if (axis == loss->shape.size() - 2) {
+			vector<vector<double>> m1 = predicted->get_matrix(new_position);
+			vector<vector<double>> m2 = ground_truth->get_matrix(new_position);
+			double loss_value = evaluate_cross_entropy(m1, m2, predicted->logger);
+			loss->set_matrix(new_position, vector<vector<double>>(1, vector<double>(1, loss_value)));
+			return;
+		}
+
+		new_position.push_back(0);
+		int position_index = new_position.size() - 1;
+
+		for (int i = 0; i < loss->shape[axis]; i++) {
+			new_position[position_index] = i;
+			recurse_cross_entropy_forward(loss, predicted, ground_truth, new_position, axis+1);
+		}
+		new_position.pop_back();
+	}
+
+
+	inline shared_ptr<Tensor> categorical_cross_entropy_forward(shared_ptr<Tensor> predicted, shared_ptr<Tensor> ground_truth) {
+		shared_ptr<Logger> logger = predicted ->logger;
+		if (predicted->shape != ground_truth->shape) {
+			logger->log(ERROR, "The shapes of the predicted and ground truth arrays are mismatched in categorical cross entropy.");
+			exit(1);
+		}
+
+		vector<int> loss_shape = predicted->shape;
+		int last_index = loss_shape.size() - 1;
+		loss_shape[last_index - 1] = 1;
+
+		int number_elements = 1;
+		for (int i = 0; i < loss_shape.size(); i++) {
+			number_elements *= loss_shape[i];
+		}
+
+		vector<double> loss_values(number_elements, 0.);
+		shared_ptr<Tensor> loss = make_shared<Tensor>(loss_values, loss_shape, logger, predicted, ground_truth);
+		vector<int> new_position {};
+		recurse_cross_entropy_forward(loss, predicted, ground_truth, new_position);
+		return loss;
+	}
+
+	
 
 
 }// namespace ml
