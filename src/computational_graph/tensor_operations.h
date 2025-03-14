@@ -275,6 +275,74 @@ namespace ml {
 
 	}
 
+
+	inline void recurse_concatenate_backward(const shared_ptr<Tensor> t3, shared_ptr<Tensor> t1, shared_ptr<Tensor> t2, vector<int> & new_position, int axis=0, int concat_dim = 0, bool use_first = true) {
+
+		if (axis == t3->shape.size() - 2) {
+			vector<vector<double>> g3 = t3->get_matrix(new_position, "gradients");
+			if (concat_dim < axis) {
+				if (use_first) t1->set_matrix(new_position, g3, "gradients");
+				else t2 ->set_matrix(new_position, g3, "gradients");
+			} else if (concat_dim == axis) {
+				vector<vector<double>> g1 {}, g2{};
+				g1.assign(g3.begin(), g3.begin() + t1->shape[axis]);
+				g2.assign(g3.begin() + t1->shape[axis], g3.end());
+				t1->set_matrix(new_position, g1, "gradients");
+				t2->set_matrix(new_position, g2, "gradients");
+			} else if (concat_dim == axis + 1) {
+				vector<double> tmp {};
+				vector<vector<double>> g1(t1->shape[axis], tmp), g2(t1->shape[axis], tmp);
+				for (int i = 0; i < t1->shape[axis]; i++) {
+					g1[i].assign(g3[i].begin(), g3[i].begin() + t1->shape[axis+1]);
+					g2[i].assign(g3[i].begin() + t1->shape[axis+1], g3[i].end());
+				}
+				t1->set_matrix(new_position, g1, "gradients");
+				t2->set_matrix(new_position, g2, "gradients");
+			}
+		}
+
+
+		new_position.push_back(0);
+		int position_index = new_position.size() - 1;
+
+		for (int i = 0; i < t3->shape[axis]; i++) {
+			new_position[position_index] = i;
+			if (axis == concat_dim && i >= t1->shape[axis]) { 
+				use_first = false;
+				new_position[position_index] = i - t1->shape[axis];
+			}
+			recurse_concatenate_backward(t3, t1, t2, new_position, axis+1, concat_dim, use_first);
+		}
+		new_position.pop_back();
+		
+	}
+
+
+	inline void concatenate_backward(shared_ptr<Tensor> t3) {
+
+		shared_ptr<Tensor> t1 = t3->input_first;
+		if (!t1) return;
+		shared_ptr<Tensor> t2 = t3->input_second;
+
+		int concat_dim = 0;
+
+		for (int i = 0; i < t1->shape.size(); i++) {
+			int t1_size = t1->shape[i];
+			int t2_size = t2->shape[i];
+			if (t1_size != t2_size) {
+				concat_dim = i;
+				break;
+			}
+		}
+
+		shared_ptr<Logger> logger = t1->logger;
+
+		vector<int> new_position{};
+		recurse_concatenate_backward(t3, t1, t2, new_position, 0, concat_dim);
+
+	}
+
+
 	inline void recurse_concatenate_forward(shared_ptr<Tensor> t3, shared_ptr<Tensor> t1, shared_ptr<Tensor> t2, vector<int> & new_position, int axis = 0, int concat_dim = 0, bool use_first = true) {
 
 
@@ -320,8 +388,11 @@ namespace ml {
 
 		for (int i = 0; i < t3->shape[axis]; i++) {
 			new_position[position_index] = i;
-			if (axis == concat_dim && i >= t1->shape[axis]) use_first = false;
-			recurse_concatenate_forward(t3, t1, t2, new_position, axis+1);
+			if (axis == concat_dim && i >= t1->shape[axis]){ 
+				use_first = false;
+				new_position[position_index] = i - t1->shape[axis];
+			}
+			recurse_concatenate_forward(t3, t1, t2, new_position, axis+1, concat_dim, use_first);
 		}
 		new_position.pop_back();
 
