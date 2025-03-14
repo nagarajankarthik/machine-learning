@@ -275,6 +275,58 @@ namespace ml {
 
 	}
 
+	inline void recurse_concatenate_forward(shared_ptr<Tensor> t3, shared_ptr<Tensor> t1, shared_ptr<Tensor> t2, vector<int> & new_position, int axis = 0, int concat_dim = 0, bool use_first = true) {
+
+
+		if (axis == t3->shape.size() - 2) {
+			if (concat_dim < axis) {
+				vector<vector<double>> current_matrix {}, current_gradients {};
+				if (use_first) { 
+					current_matrix = t1->get_matrix(new_position, "values");
+					current_gradients = t1->get_matrix(new_position, "gradients");
+				} else {
+					current_matrix = t2->get_matrix(new_position, "values");
+					current_gradients = t2->get_matrix(new_position, "gradients");
+				}
+				t3 ->set_matrix(new_position, current_matrix, "values");
+				t3 ->set_matrix(new_position, current_gradients, "gradients");
+			} else if (concat_dim == axis) {
+				vector<vector<double>> first_matrix = t1->get_matrix(new_position, "values");
+				vector<vector<double>> first_gradients = t1 -> get_matrix(new_position, "gradients");
+				vector<vector<double>> second_matrix = t2->get_matrix(new_position, "values");
+				vector<vector<double>> second_gradients = t2 -> get_matrix(new_position, "gradients");
+				first_matrix.insert(first_matrix.end(), second_matrix.begin(), second_matrix.end());
+				first_gradients.insert(first_gradients.end(), second_gradients.begin(), second_gradients.end());
+				t3 ->set_matrix(new_position, first_matrix, "values");
+				t3 -> set_matrix(new_position, first_gradients, "gradients");
+			} else if (concat_dim == axis + 1) {
+				vector<vector<double>> first_matrix = t1->get_matrix(new_position, "values");
+				vector<vector<double>> first_gradients = t1 -> get_matrix(new_position, "gradients");
+				vector<vector<double>> second_matrix = t2->get_matrix(new_position, "values");
+				vector<vector<double>> second_gradients = t2 -> get_matrix(new_position, "gradients");
+				for (int i = 0; i < first_matrix.size(); i++) {
+					first_matrix[i].insert(first_matrix[i].end(), second_matrix[i].begin(), second_matrix[i].end());
+					first_gradients[i].insert(first_gradients[i].end(), second_gradients[i].begin(), second_gradients[i].end());
+				}
+				t3 ->set_matrix(new_position, first_matrix, "values");
+				t3 ->set_matrix(new_position, first_gradients, "gradients");
+			}
+
+			return;
+		}
+
+		new_position.push_back(0);
+		int position_index = new_position.size() - 1;
+
+		for (int i = 0; i < t3->shape[axis]; i++) {
+			new_position[position_index] = i;
+			if (axis == concat_dim && i >= t1->shape[axis]) use_first = false;
+			recurse_concatenate_forward(t3, t1, t2, new_position, axis+1);
+		}
+		new_position.pop_back();
+
+	}
+
 	inline shared_ptr<Tensor> concatenate_forward(shared_ptr<Tensor> t1, shared_ptr<Tensor> t2, int concat_dim = 0) {
 		vector<int> first_shape = t1->shape;
 		vector<int> second_shape = t2->shape;
@@ -297,6 +349,8 @@ namespace ml {
 		new_shape[concat_dim] += second_shape[concat_dim];
 		int new_size = t1->values.size() + t2->values.size();
 		shared_ptr<Tensor> t3 = make_shared<Tensor>(vector<double>(new_size, 0.), new_shape, logger, t1, t2, concatenate_backward);
+		vector<int> new_position{};
+		recurse_concatenate_forward(t3, t1, t2, new_position);
 		
 	}
 
