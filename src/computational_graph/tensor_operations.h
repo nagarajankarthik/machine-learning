@@ -422,6 +422,7 @@ namespace ml {
 		shared_ptr<Tensor> t3 = make_shared<Tensor>(vector<double>(new_size, 0.), new_shape, logger, t1, t2, concatenate_backward);
 		vector<int> new_position{};
 		recurse_concatenate_forward(t3, t1, t2, new_position);
+		return t3;
 		
 	}
 
