@@ -49,5 +49,25 @@ int main() {
 		cout << endl;
 	}
 
+	shared_ptr<Tensor> x = concatenate_forward(u, v);
+	logger->log(INFO, "Created tensor x by concatenating u and v.");
+	logger->log(INFO, "Shape of x");
+	for (int i = 0; i < x->shape.size(); i++) {
+		cout << x->shape[i] << ", ";
+	}
+	cout << endl;
+
+	fill(x->gradients.begin(), x->gradients.end(), 0.5);
+	x->backward();
+	position[0] = 1;
+	grad = u->get_matrix(position, "gradients");
+	for (int i = 0; i < grad.size(); i++) {
+		for (int j = 0; j < grad[0].size(); j++) {
+			cout << grad[i][j] << " ";
+		}
+		cout << endl;
+	}
+
+
 	return 0;
 }
