@@ -11,12 +11,15 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 find_package(OpenMP REQUIRED)
 
 # add subdirectories
+add_subdirectory(/usr/src/googletest gtest)
 add_subdirectory(base_model)
 add_subdirectory(utils)
 add_subdirectory(ensemble)
+add_subdirectory(computational_graph)
 
 # add executables
 add_executable(ml main.cpp)
+add_executable(ml_test test_main.cpp)
 
 # include directories
 target_include_directories(ml PRIVATE "${PROJECT_SOURCE_DIR}")
