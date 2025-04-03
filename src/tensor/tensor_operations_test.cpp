@@ -27,7 +27,7 @@ class TensorOpsTest : public testing::Test {
 	}
 };
 
-TEST_F(TensorOpsTest, BatchMatmulTest) {
+TEST_F(TensorOpsTest, MatmulForwardTest) {
 	shared_ptr<Tensor> c = batch_matmul_forward(a, b);
 	logger->log(INFO, "Created tensor c by multiplying a and b.");
 	vector<int> position{0};
@@ -35,6 +35,28 @@ TEST_F(TensorOpsTest, BatchMatmulTest) {
 	for (int i = 0; i < matrix.size(); i++) {
 		for (int j = 0; j < matrix[0].size(); j++) {
 			ASSERT_TRUE(fabs(matrix[i][j] - 2.) < tol);
+		}
+	}
+}
+
+TEST_F(TensorOpsTest, MatmulBackwardTest) {
+	shared_ptr<Tensor> c = batch_matmul_forward(a, b);
+	logger->log(INFO, "Created tensor c by multiplying a and b.");
+	vector<int> position{0};
+	fill(c->gradients.begin(), c->gradients.end(), 1.);
+	c->backward();
+
+	vector<vector<double>> grad = a->get_matrix(position, "gradients");
+	for (int i = 0; i < grad.size(); i++) {
+		for (int j = 0; j < grad[0].size(); j++) {
+			ASSERT_FLOAT_EQ(grad[i][j], 4.);
+		}
+	}
+
+	grad = b->get_matrix(position, "gradients");
+	for (int i = 0; i < grad.size(); i++) {
+		for (int j = 0; j < grad[0].size(); j++) {
+			ASSERT_FLOAT_EQ(grad[i][j], 2.);
 		}
 	}
 }
