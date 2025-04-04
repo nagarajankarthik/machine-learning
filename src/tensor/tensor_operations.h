@@ -519,7 +519,7 @@ inline shared_ptr<Tensor> concatenate_forward(shared_ptr<Tensor> t1,
 	    make_shared<Tensor>(vector<double>(new_size, 0.), new_shape, logger,
 				t1, t2, concatenate_backward);
 	vector<int> new_position{};
-	recurse_concatenate_forward(t3, t1, t2, new_position);
+	recurse_concatenate_forward(t3, t1, t2, new_position, 0, concat_dim);
 	return t3;
 }
 
