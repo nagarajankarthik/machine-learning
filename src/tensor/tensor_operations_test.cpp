@@ -1,5 +1,6 @@
 #include "tensor.h"
 #include "tensor_operations.h"
+#include <gtest/gtest-spi.h>
 #include <gtest/gtest.h>
 #include <memory>
 #include <vector>
@@ -85,6 +86,68 @@ TEST_F(TensorOpsTest, MatmulForwardTest) {
 TEST_F(TensorOpsTest, MatmulBackwardTest) {
 	shared_ptr<Tensor> c = batch_matmul_forward(a, b);
 	logger->log(INFO, "Created tensor c by multiplying a and b.");
+	vector<int> position{0};
+	fill(c->gradients.begin(), c->gradients.end(), 1.);
+	c->backward();
+
+	vector<vector<double>> grad = a->get_matrix(position, "gradients");
+	for (int i = 0; i < grad.size(); i++) {
+		for (int j = 0; j < grad[0].size(); j++) {
+			ASSERT_FLOAT_EQ(grad[i][j], 4.);
+		}
+	}
+
+	grad = b->get_matrix(position, "gradients");
+	for (int i = 0; i < grad.size(); i++) {
+		for (int j = 0; j < grad[0].size(); j++) {
+			ASSERT_FLOAT_EQ(grad[i][j], 2.);
+		}
+	}
+}
+
+// Perform concatenation on batch dimension
+TEST_F(TensorOpsTest, ConcatenateBatchForwardTest) {
+	shared_ptr<Tensor> c = concatenate_forward(a, b, 0);
+	logger->log(INFO, "Created tensor c by concatenating a and b.");
+	ASSERT_EQ(c->values.size(), 12);
+	vector<int> c_shape = c->shape;
+	ASSERT_EQ(c_shape.size(), 3);
+	ASSERT_EQ(c_shape[0], 3);
+	ASSERT_EQ(c_shape[1], 2);
+	ASSERT_EQ(c_shape[2], 2);
+	vector<int> position{0};
+	vector<vector<double>> matrix = c->get_matrix(position, "values");
+	for (int i = 0; i < matrix.size(); i++) {
+		for (int j = 0; j < matrix[0].size(); j++) {
+			ASSERT_FLOAT_EQ(matrix[i][j], 1.);
+		}
+	}
+}
+
+// Perform concatenation along rows of matrix
+TEST_F(TensorOpsTest, ConcatenateRowForwardTest) {
+
+	shared_ptr<Tensor> c = concatenate_forward(a, a, 1);
+
+	logger->log(INFO, "Created tensor c by concatenating a with itself.");
+	ASSERT_EQ(c->values.size(), 8);
+	vector<int> c_shape = c->shape;
+	ASSERT_EQ(c_shape.size(), 3);
+	ASSERT_EQ(c_shape[0], a->shape[0]);
+	ASSERT_EQ(c_shape[1], 2 * a->shape[1]);
+	ASSERT_EQ(c_shape[2], a->shape[2]);
+	vector<int> position{0};
+	vector<vector<double>> matrix = c->get_matrix(position, "values");
+	for (int i = 0; i < matrix.size(); i++) {
+		for (int j = 0; j < matrix[0].size(); j++) {
+			ASSERT_FLOAT_EQ(matrix[i][j], 1.);
+		}
+	}
+}
+
+TEST_F(TensorOpsTest, DISABLED_ConcatenateBackwardTest) {
+	shared_ptr<Tensor> c = concatenate_forward(a, b);
+	logger->log(INFO, "Created tensor c by concatenating a and b.");
 	vector<int> position{0};
 	fill(c->gradients.begin(), c->gradients.end(), 1.);
 	c->backward();
