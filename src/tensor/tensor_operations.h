@@ -378,23 +378,12 @@ inline void recurse_concatenate_backward(const shared_ptr<Tensor> t3,
 	new_position.pop_back();
 }
 
-inline void concatenate_backward(shared_ptr<Tensor> t3) {
+inline void concatenate_backward(shared_ptr<Tensor> t3, int concat_dim) {
 
 	shared_ptr<Tensor> t1 = t3->input_first;
 	if (!t1)
 		return;
 	shared_ptr<Tensor> t2 = t3->input_second;
-
-	int concat_dim = 0;
-
-	for (int i = 0; i < t1->shape.size(); i++) {
-		int t1_size = t1->shape[i];
-		int t2_size = t2->shape[i];
-		if (t1_size != t2_size) {
-			concat_dim = i;
-			break;
-		}
-	}
 
 	shared_ptr<Logger> logger = t1->logger;
 
@@ -515,9 +504,25 @@ inline shared_ptr<Tensor> concatenate_forward(shared_ptr<Tensor> t1,
 	vector<int> new_shape = first_shape;
 	new_shape[concat_dim] += second_shape[concat_dim];
 	int new_size = t1->values.size() + t2->values.size();
+	/**
+	 * See
+	 * https://stackoverflow.com/questions/30217956/error-variable-cannot-be-implicitly-captured-because-no-default-capture-mode-h
+	 * https://stackoverflow.com/questions/55124517/stdfunction-and-stdbind-return-value
+	 * As explained in the second of the two links above, the next 3 lines
+	 * of code are commented out because the lambda function method is
+	 * preferred over the std::bind method
+	 */
+
+	// std::function<void(shared_ptr<Tensor>)> concat_back =
+	//     std::bind(concatenate_backward, std::placeholders::_1,
+	//     concat_dim);
+	auto concat_back = [concat_dim](shared_ptr<Tensor> t3) {
+		concatenate_backward(t3, concat_dim);
+	};
+
 	shared_ptr<Tensor> t3 =
 	    make_shared<Tensor>(vector<double>(new_size, 0.), new_shape, logger,
-				t1, t2, concatenate_backward);
+				t1, t2, concat_back);
 	vector<int> new_position{};
 	recurse_concatenate_forward(t3, t1, t2, new_position, 0, concat_dim);
 	return t3;
