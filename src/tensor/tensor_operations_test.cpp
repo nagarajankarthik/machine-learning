@@ -124,6 +124,30 @@ TEST_F(TensorOpsTest, ConcatenateBatchForwardTest) {
 	}
 }
 
+TEST_F(TensorOpsTest, ConcatenateBatchBackwardTest) {
+	shared_ptr<Tensor> c = concatenate_forward(a, b);
+	logger->log(
+	    INFO,
+	    "Created tensor c by concatenating a and b along batch dimension.");
+	fill(c->gradients.begin(), c->gradients.end(), 1.);
+	c->backward();
+
+	vector<int> position{0};
+	vector<vector<double>> grad = a->get_matrix(position, "gradients");
+	for (int i = 0; i < grad.size(); i++) {
+		for (int j = 0; j < grad[0].size(); j++) {
+			ASSERT_FLOAT_EQ(grad[i][j], 1.);
+		}
+	}
+
+	grad = b->get_matrix(position, "gradients");
+	for (int i = 0; i < grad.size(); i++) {
+		for (int j = 0; j < grad[0].size(); j++) {
+			ASSERT_FLOAT_EQ(grad[i][j], 1.);
+		}
+	}
+}
+
 // Perform concatenation along rows of matrix
 TEST_F(TensorOpsTest, ConcatenateRowForwardTest) {
 
@@ -145,9 +169,12 @@ TEST_F(TensorOpsTest, ConcatenateRowForwardTest) {
 	}
 }
 
-TEST_F(TensorOpsTest, DISABLED_ConcatenateBackwardTest) {
-	shared_ptr<Tensor> c = concatenate_forward(a, b);
-	logger->log(INFO, "Created tensor c by concatenating a and b.");
+TEST_F(TensorOpsTest, ConcatenateRowBackwardTest) {
+
+	shared_ptr<Tensor> c = concatenate_forward(a, a, 1);
+
+	logger->log(INFO, "Created tensor c by concatenating a with itself.");
+
 	vector<int> position{0};
 	fill(c->gradients.begin(), c->gradients.end(), 1.);
 	c->backward();
@@ -155,11 +182,43 @@ TEST_F(TensorOpsTest, DISABLED_ConcatenateBackwardTest) {
 	vector<vector<double>> grad = a->get_matrix(position, "gradients");
 	for (int i = 0; i < grad.size(); i++) {
 		for (int j = 0; j < grad[0].size(); j++) {
-			ASSERT_FLOAT_EQ(grad[i][j], 4.);
+			ASSERT_FLOAT_EQ(grad[i][j], 2.);
 		}
 	}
+}
 
-	grad = b->get_matrix(position, "gradients");
+// Perform concatenation along columns of matrix
+TEST_F(TensorOpsTest, ConcatenateColumnForwardTest) {
+
+	shared_ptr<Tensor> c = concatenate_forward(a, a, 2);
+
+	logger->log(INFO, "Created tensor c by concatenating a with itself.");
+	ASSERT_EQ(c->values.size(), 8);
+	vector<int> c_shape = c->shape;
+	ASSERT_EQ(c_shape.size(), 3);
+	ASSERT_EQ(c_shape[0], a->shape[0]);
+	ASSERT_EQ(c_shape[1], a->shape[1]);
+	ASSERT_EQ(c_shape[2], 2 * a->shape[2]);
+	vector<int> position{0};
+	vector<vector<double>> matrix = c->get_matrix(position, "values");
+	for (int i = 0; i < matrix.size(); i++) {
+		for (int j = 0; j < matrix[0].size(); j++) {
+			ASSERT_FLOAT_EQ(matrix[i][j], 1.);
+		}
+	}
+}
+
+TEST_F(TensorOpsTest, ConcatenateColumnBackwardTest) {
+
+	shared_ptr<Tensor> c = concatenate_forward(a, a, 2);
+
+	logger->log(INFO, "Created tensor c by concatenating a with itself.");
+
+	vector<int> position{0};
+	fill(c->gradients.begin(), c->gradients.end(), 1.);
+	c->backward();
+
+	vector<vector<double>> grad = a->get_matrix(position, "gradients");
 	for (int i = 0; i < grad.size(); i++) {
 		for (int j = 0; j < grad[0].size(); j++) {
 			ASSERT_FLOAT_EQ(grad[i][j], 2.);
@@ -167,3 +226,85 @@ TEST_F(TensorOpsTest, DISABLED_ConcatenateBackwardTest) {
 	}
 }
 
+// Testing activation functions
+
+TEST_F(TensorOpsTest, ReluForwardTest) {
+
+	a->values = {-1., -1., 1., 1.};
+	shared_ptr<Tensor> c = relu_forward(a);
+	logger->log(INFO, "Created tensor c by applying relu to a.");
+	ASSERT_EQ(c->values.size(), 4);
+	vector<int> c_shape = c->shape;
+	ASSERT_EQ(c_shape.size(), 3);
+	ASSERT_EQ(c_shape[0], a->shape[0]);
+	ASSERT_EQ(c_shape[1], a->shape[1]);
+	ASSERT_EQ(c_shape[2], a->shape[2]);
+	vector<int> position{0};
+	vector<vector<double>> matrix = c->get_matrix(position, "values");
+	for (int j = 0; j < matrix[0].size(); j++) {
+		ASSERT_FLOAT_EQ(matrix[0][j], 0.);
+	}
+	for (int j = 0; j < matrix[0].size(); j++) {
+		ASSERT_FLOAT_EQ(matrix[1][j], 1.);
+	}
+}
+
+TEST_F(TensorOpsTest, ReluBackwardTest) {
+
+	a->values = {-1., -1., 1., 1.};
+	logger->log(INFO, "Created tensor a.");
+	shared_ptr<Tensor> c = relu_forward(a);
+	logger->log(INFO, "Created tensor c by applying relu to a.");
+	vector<int> position{0};
+	fill(c->gradients.begin(), c->gradients.end(), 1.);
+	logger->log(INFO, "Filled gradients with 1.");
+	c->backward();
+	vector<vector<double>> grad = a->get_matrix(position, "gradients");
+	for (int j = 0; j < grad[0].size(); j++) {
+		ASSERT_FLOAT_EQ(grad[0][j], 0.);
+	}
+	for (int j = 0; j < grad[0].size(); j++) {
+		ASSERT_FLOAT_EQ(grad[1][j], 1.);
+	}
+}
+
+TEST_F(TensorOpsTest, SigmoidForwardTest) {
+
+	a->values = {-1., -1., 1., 1.};
+	shared_ptr<Tensor> c = sigmoid_forward(a);
+	logger->log(INFO,
+		    "Created tensor c by applying sigmoid function to a.");
+	ASSERT_EQ(c->values.size(), 4);
+	vector<int> c_shape = c->shape;
+	ASSERT_EQ(c_shape.size(), 3);
+	ASSERT_EQ(c_shape[0], a->shape[0]);
+	ASSERT_EQ(c_shape[1], a->shape[1]);
+	ASSERT_EQ(c_shape[2], a->shape[2]);
+	vector<int> position{0};
+	vector<vector<double>> matrix = c->get_matrix(position, "values");
+	for (int j = 0; j < matrix[0].size(); j++) {
+		ASSERT_FLOAT_EQ(matrix[0][j], 0.26894143);
+	}
+	for (int j = 0; j < matrix[0].size(); j++) {
+		ASSERT_FLOAT_EQ(matrix[1][j], 0.7310586);
+	}
+}
+
+TEST_F(TensorOpsTest, DISABLED_SigmoidBackwardTest) {
+
+	a->values = {-1., -1., 1., 1.};
+	logger->log(INFO, "Created tensor a.");
+	shared_ptr<Tensor> c = sigmoid_forward(a);
+	logger->log(INFO, "Created tensor c by applying relu to a.");
+	vector<int> position{0};
+	fill(c->gradients.begin(), c->gradients.end(), 1.);
+	logger->log(INFO, "Filled gradients with 1.");
+	c->backward();
+	vector<vector<double>> grad = a->get_matrix(position, "gradients");
+	for (int j = 0; j < grad[0].size(); j++) {
+		ASSERT_FLOAT_EQ(grad[0][j], 0.);
+	}
+	for (int j = 0; j < grad[0].size(); j++) {
+		ASSERT_FLOAT_EQ(grad[1][j], 1.);
+	}
+}
