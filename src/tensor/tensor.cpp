@@ -191,7 +191,8 @@ void Tensor::backward() {
 		return;
 	backward_function(shared_from_this());
 	input_first->backward();
-	input_second->backward();
+	if (input_second)
+		input_second->backward();
 }
 
 } // namespace ml
