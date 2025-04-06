@@ -252,12 +252,10 @@ TEST_F(TensorOpsTest, ReluForwardTest) {
 TEST_F(TensorOpsTest, ReluBackwardTest) {
 
 	a->values = {-1., -1., 1., 1.};
-	logger->log(INFO, "Created tensor a.");
 	shared_ptr<Tensor> c = relu_forward(a);
 	logger->log(INFO, "Created tensor c by applying relu to a.");
 	vector<int> position{0};
 	fill(c->gradients.begin(), c->gradients.end(), 1.);
-	logger->log(INFO, "Filled gradients with 1.");
 	c->backward();
 	vector<vector<double>> grad = a->get_matrix(position, "gradients");
 	for (int j = 0; j < grad[0].size(); j++) {
@@ -290,21 +288,17 @@ TEST_F(TensorOpsTest, SigmoidForwardTest) {
 	}
 }
 
-TEST_F(TensorOpsTest, DISABLED_SigmoidBackwardTest) {
+TEST_F(TensorOpsTest, SigmoidBackwardTest) {
 
 	a->values = {-1., -1., 1., 1.};
-	logger->log(INFO, "Created tensor a.");
 	shared_ptr<Tensor> c = sigmoid_forward(a);
-	logger->log(INFO, "Created tensor c by applying relu to a.");
+	logger->log(INFO, "Created tensor c by applying sigmoid to a.");
 	vector<int> position{0};
 	fill(c->gradients.begin(), c->gradients.end(), 1.);
-	logger->log(INFO, "Filled gradients with 1.");
 	c->backward();
-	vector<vector<double>> grad = a->get_matrix(position, "gradients");
-	for (int j = 0; j < grad[0].size(); j++) {
-		ASSERT_FLOAT_EQ(grad[0][j], 0.);
-	}
-	for (int j = 0; j < grad[0].size(); j++) {
-		ASSERT_FLOAT_EQ(grad[1][j], 1.);
+
+	for (int i = 0; i < c->values.size(); i++) {
+		double val = c->values[i];
+		ASSERT_FLOAT_EQ(a->gradients[i], val * (1. - val));
 	}
 }
