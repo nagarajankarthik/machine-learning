@@ -293,7 +293,6 @@ TEST_F(TensorOpsTest, SigmoidBackwardTest) {
 	a->values = {-1., -1., 1., 1.};
 	shared_ptr<Tensor> c = sigmoid_forward(a);
 	logger->log(INFO, "Created tensor c by applying sigmoid to a.");
-	vector<int> position{0};
 	fill(c->gradients.begin(), c->gradients.end(), 1.);
 	c->backward();
 
@@ -329,12 +328,63 @@ TEST_F(TensorOpsTest, TanhBackwardTest) {
 	a->values = {-1., -1., 1., 1.};
 	shared_ptr<Tensor> c = tanh_forward(a);
 	logger->log(INFO, "Created tensor c by applying tanh to a.");
-	vector<int> position{0};
 	fill(c->gradients.begin(), c->gradients.end(), 1.);
 	c->backward();
 
 	for (int i = 0; i < c->values.size(); i++) {
 		double val = c->values[i];
 		ASSERT_FLOAT_EQ(a->gradients[i], 1. - val * val);
+	}
+}
+
+TEST_F(TensorOpsTest, SoftmaxForwardTest) {
+
+	a->values = {-1., -1., 1., 1.};
+	shared_ptr<Tensor> c = softmax_forward(a);
+	logger->log(INFO,
+		    "Created tensor c by applying softmax function to a.");
+	ASSERT_EQ(c->values.size(), 4);
+	vector<int> c_shape = c->shape;
+	ASSERT_EQ(c_shape.size(), 3);
+	ASSERT_EQ(c_shape[0], a->shape[0]);
+	ASSERT_EQ(c_shape[1], a->shape[1]);
+	ASSERT_EQ(c_shape[2], a->shape[2]);
+	vector<int> position{0};
+	vector<vector<double>> matrix = c->get_matrix(position, "values");
+	double e2 = exp(2.);
+	for (int j = 0; j < matrix[0].size(); j++) {
+		ASSERT_FLOAT_EQ(matrix[0][j], 1. / (1. + e2));
+	}
+	for (int j = 0; j < matrix[0].size(); j++) {
+		ASSERT_FLOAT_EQ(matrix[1][j], e2 / (1. + e2));
+	}
+}
+
+TEST_F(TensorOpsTest, SoftmaxBackwardTest) {
+
+	a->values = {-1., -1., 1., 1.};
+	shared_ptr<Tensor> c = softmax_forward(a);
+	logger->log(INFO, "Created tensor c by applying softmax to a.");
+	vector<int> position{0};
+	fill(c->gradients.begin(), c->gradients.end(), 1.);
+	c->backward();
+
+	vector<vector<double>> softmax_values =
+	    c->get_matrix(position, "values");
+	vector<vector<double>> softmax_derivatives =
+	    c->get_matrix(position, "gradients");
+	vector<vector<double>> calculated_derivatives =
+	    a->get_matrix(position, "gradients");
+	for (int j = 0; j < calculated_derivatives[0].size(); j++) {
+		for (int i = 0; i < calculated_derivatives.size(); i++) {
+			double expected_derivative =
+			    softmax_values[i][j] *
+			    (softmax_derivatives[i][j] -
+			     matrix_col_sum(elementwise_multiplication(
+				 softmax_derivatives, softmax_values,
+				 logger))[j]);
+			ASSERT_FLOAT_EQ(calculated_derivatives[i][j],
+					expected_derivative);
+		}
 	}
 }
