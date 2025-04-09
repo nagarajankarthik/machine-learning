@@ -302,3 +302,39 @@ TEST_F(TensorOpsTest, SigmoidBackwardTest) {
 		ASSERT_FLOAT_EQ(a->gradients[i], val * (1. - val));
 	}
 }
+
+TEST_F(TensorOpsTest, TanhForwardTest) {
+
+	a->values = {-1., -1., 1., 1.};
+	shared_ptr<Tensor> c = tanh_forward(a);
+	logger->log(INFO, "Created tensor c by applying tanh function to a.");
+	ASSERT_EQ(c->values.size(), 4);
+	vector<int> c_shape = c->shape;
+	ASSERT_EQ(c_shape.size(), 3);
+	ASSERT_EQ(c_shape[0], a->shape[0]);
+	ASSERT_EQ(c_shape[1], a->shape[1]);
+	ASSERT_EQ(c_shape[2], a->shape[2]);
+	vector<int> position{0};
+	vector<vector<double>> matrix = c->get_matrix(position, "values");
+	for (int j = 0; j < matrix[0].size(); j++) {
+		ASSERT_FLOAT_EQ(matrix[0][j], -0.7615942);
+	}
+	for (int j = 0; j < matrix[0].size(); j++) {
+		ASSERT_FLOAT_EQ(matrix[1][j], 0.7615942);
+	}
+}
+
+TEST_F(TensorOpsTest, TanhBackwardTest) {
+
+	a->values = {-1., -1., 1., 1.};
+	shared_ptr<Tensor> c = tanh_forward(a);
+	logger->log(INFO, "Created tensor c by applying tanh to a.");
+	vector<int> position{0};
+	fill(c->gradients.begin(), c->gradients.end(), 1.);
+	c->backward();
+
+	for (int i = 0; i < c->values.size(); i++) {
+		double val = c->values[i];
+		ASSERT_FLOAT_EQ(a->gradients[i], 1. - val * val);
+	}
+}
