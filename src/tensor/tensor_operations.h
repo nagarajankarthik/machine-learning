@@ -556,7 +556,7 @@ inline void sigmoid_backward(shared_ptr<Tensor> t3) {
 	if (!t1)
 		return;
 	for (int i = 0; i < t1->values.size(); i++) {
-		int function_result = t3->values[i];
+		double function_result = t3->values[i];
 		t1->gradients[i] =
 		    function_result * (1. - function_result) * t3->gradients[i];
 	}
@@ -579,7 +579,7 @@ inline void tanh_backward(shared_ptr<Tensor> t3) {
 	if (!t1)
 		return;
 	for (int i = 0; i < t1->values.size(); i++) {
-		int function_result = t3->values[i];
+		double function_result = t3->values[i];
 		t1->gradients[i] =
 		    (1. - function_result * function_result) * t3->gradients[i];
 	}
