@@ -388,3 +388,29 @@ TEST_F(TensorOpsTest, SoftmaxBackwardTest) {
 		}
 	}
 }
+
+TEST_F(TensorOpsTest, CrossEntropyForwardTest) {
+	vector<int> test_shape{1, 2, 2};
+	vector<double> predicted_values{0.8, 0.2, 0.1, 0.9};
+	vector<double> ground_truth_values{1., 0., 0., 1.};
+	shared_ptr<Tensor> predicted =
+	    make_shared<Tensor>(predicted_values, test_shape, logger);
+	shared_ptr<Tensor> ground_truth =
+	    make_shared<Tensor>(ground_truth_values, test_shape, logger);
+	shared_ptr<Tensor> loss =
+	    categorical_cross_entropy_forward(predicted, ground_truth);
+	logger->log(
+	    INFO,
+	    "Calculated loss based on ground truth and predicted values.");
+	ASSERT_EQ(loss->values.size(), 2);
+	vector<int> loss_shape = loss->shape;
+	ASSERT_EQ(loss_shape.size(), 3);
+	ASSERT_EQ(loss_shape[0], predicted->shape[0]);
+	ASSERT_EQ(loss_shape[1], 1);
+	ASSERT_EQ(loss_shape[2], predicted->shape[2]);
+	vector<int> position{0};
+	vector<vector<double>> loss_values =
+	    loss->get_matrix(position, "values");
+	ASSERT_FLOAT_EQ(loss_values[0][0], -log(0.8));
+	ASSERT_FLOAT_EQ(loss_values[0][1], -log(0.9));
+}
