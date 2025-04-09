@@ -22,11 +22,18 @@ Multiplies corresponding matrices of two input tensors. The two tensors must hav
 
 ## Activation Functions
 
-Activation functions are applied separately to each column of every matrix comprising the input tensor. The output and input tensors have the same shape. In the following sections, $\bf{x}$ and $\mathbf{y}$ are used to denote the inputs and outputs of an activation function operation. They are both column vectors.
+Activation functions are applied separately to each column of every matrix comprising the input tensor. The output and input tensors have the same shape. In the following sections, $\mathbf{x}$ and $\mathbf{y}$ are used to denote the inputs and outputs of an activation function operation. They are both column vectors.
 
 ### Rectified Linear Unit (ReLU)
 
+Forward pass:
 
+$$
+y_i = \begin{cases}
+x_i & \text{if } x_i > 0 \\
+0 & \text{otherwise}
+\end{cases}
+$$
 
 
 ### Standard Logistic (also known as Sigmoid)
