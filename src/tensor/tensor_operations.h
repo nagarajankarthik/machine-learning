@@ -636,9 +636,9 @@ inline void recurse_softmax_backward(const shared_ptr<Tensor> t3,
 	if (axis == t3->shape.size() - 2) {
 		vector<vector<double>> g3 =
 		    t3->get_matrix(new_position, "gradients");
-		vector<vector<double>> m1 = t1->get_matrix(new_position);
+		vector<vector<double>> m3 = t3->get_matrix(new_position);
 		vector<vector<double>> gradient_values_product =
-		    elementwise_multiplication(g3, m1, t1->logger);
+		    elementwise_multiplication(g3, m3, t1->logger);
 		vector<double> gradient_values_product_sum =
 		    matrix_col_sum(gradient_values_product);
 
@@ -647,7 +647,7 @@ inline void recurse_softmax_backward(const shared_ptr<Tensor> t3,
 		for (int j = 0; j < g1[0].size(); j++) {
 			for (int i = 0; i < g1.size(); i++) {
 				g1[i][j] =
-				    m1[i][j] *
+				    m3[i][j] *
 				    (g3[i][j] - gradient_values_product_sum[j]);
 			}
 		}
