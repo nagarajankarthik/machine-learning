@@ -391,7 +391,7 @@ TEST_F(TensorOpsTest, SoftmaxBackwardTest) {
 
 TEST_F(TensorOpsTest, CrossEntropyForwardTest) {
 	vector<int> test_shape{1, 2, 2};
-	vector<double> predicted_values{0.8, 0.2, 0.1, 0.9};
+	vector<double> predicted_values{0.8, 0.1, 0.2, 0.9};
 	vector<double> ground_truth_values{1., 0., 0., 1.};
 	shared_ptr<Tensor> predicted =
 	    make_shared<Tensor>(predicted_values, test_shape, logger);
@@ -413,4 +413,35 @@ TEST_F(TensorOpsTest, CrossEntropyForwardTest) {
 	    loss->get_matrix(position, "values");
 	ASSERT_FLOAT_EQ(loss_values[0][0], -log(0.8));
 	ASSERT_FLOAT_EQ(loss_values[0][1], -log(0.9));
+}
+
+TEST_F(TensorOpsTest, CrossEntropyBackwardTest) {
+
+	vector<int> test_shape{1, 2, 2};
+	vector<double> predicted_values{0.8, 0.1, 0.2, 0.9};
+	vector<double> ground_truth_values{1., 0., 0., 1.};
+	shared_ptr<Tensor> predicted =
+	    make_shared<Tensor>(predicted_values, test_shape, logger);
+	shared_ptr<Tensor> ground_truth =
+	    make_shared<Tensor>(ground_truth_values, test_shape, logger);
+	shared_ptr<Tensor> loss =
+	    categorical_cross_entropy_forward(predicted, ground_truth);
+	logger->log(
+	    INFO,
+	    "Calculated loss based on ground truth and predicted values.");
+	fill(loss->gradients.begin(), loss->gradients.end(), 1.);
+	loss->backward();
+
+	vector<double> expected_derivatives{
+	    -ground_truth_values[0] / predicted_values[0],
+	    -ground_truth_values[1] / predicted_values[1],
+	    -ground_truth_values[2] / predicted_values[2],
+	    -ground_truth_values[3] / predicted_values[3],
+	};
+
+	for (int i = 0; i < predicted->gradients.size(); i++) {
+		double pred_grad = predicted->gradients[i];
+		double expected_grad = expected_derivatives[i];
+		ASSERT_FLOAT_EQ(pred_grad, expected_grad);
+	}
 }
