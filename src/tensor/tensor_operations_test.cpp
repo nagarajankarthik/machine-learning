@@ -445,3 +445,29 @@ TEST_F(TensorOpsTest, CrossEntropyBackwardTest) {
 		ASSERT_FLOAT_EQ(pred_grad, expected_grad);
 	}
 }
+
+TEST_F(TensorOpsTest, MeanSquareErrorForwardTest) {
+	vector<int> test_shape{1, 2, 2};
+	vector<double> predicted_values{0.9, 1.1, 0.2, 0.9};
+	vector<double> ground_truth_values{0.8, 1.5, 0.1, 0.8};
+	shared_ptr<Tensor> predicted =
+	    make_shared<Tensor>(predicted_values, test_shape, logger);
+	shared_ptr<Tensor> ground_truth =
+	    make_shared<Tensor>(ground_truth_values, test_shape, logger);
+	shared_ptr<Tensor> loss =
+	    mean_squared_error_forward(predicted, ground_truth);
+	logger->log(INFO, "Calculated mean squared error loss based on ground "
+			  "truth and predicted values.");
+	ASSERT_EQ(loss->values.size(), 4);
+	vector<int> loss_shape = loss->shape;
+	ASSERT_EQ(loss_shape.size(), 3);
+	ASSERT_EQ(loss_shape[0], predicted->shape[0]);
+	ASSERT_EQ(loss_shape[1], predicted->shape[1]);
+	ASSERT_EQ(loss_shape[2], predicted->shape[2]);
+	for (int i = 0; i < loss->values.size(); i++) {
+		double expected_loss =
+		    (predicted->values[i] - ground_truth->values[i]) *
+		    (predicted->values[i] - ground_truth->values[i]);
+		ASSERT_FLOAT_EQ(loss->values[i], expected_loss);
+	}
+}
