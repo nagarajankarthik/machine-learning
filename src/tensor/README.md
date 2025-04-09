@@ -30,15 +30,63 @@ Forward pass:
 
 $$
 y_i = \begin{cases}
-x_i & \text{if } x_i > 0 \\
+x_i & \text{if } x_i \ge 0 \\
 0 & \text{otherwise}
 \end{cases}
 $$
 
+Back-propagation:
+
+$$
+\frac{\partial L}{\partial x_i} = \begin{cases}
+\frac{\partial L}{\partial y_i} \times 1 & \text{if } x_i \ge 0 \\
+0 & \text{otherwise}
+\end{cases}
+$$
 
 ### Standard Logistic (also known as Sigmoid)
 
+Forward pass:
+
+$$
+y_i = \frac{1}{1 + \exp(-x_i)}
+$$
+
+Back-propagation:
+
+
+$$
+y_i(1 + \exp(-x_i)) = 1
+$$
+$$
+\frac{dy_i}{dx_i}(1 + \exp(-x_i)) + y_i(-\exp(-x_i)) = 0
+$$
+
+$$
+\frac{dy_i}{dx_i}(1 + \exp(-x_i)) = y_i(\exp(-x_i))
+$$
+
+$$
+\frac{dy_i}{dx_i} = y_i \frac{\exp(-x_i)}{1 + \exp(-x_i)} = y_i(1 - y_i)
+$$
+
+
+$$
+\frac{\partial L}{\partial x_i} = \frac{\partial L}{\partial y_i} \frac{dy_i}{dx_i}
+$$
+
 ### Hyperbolic Tangent
+
+Forward pass:
+
+$$
+y_i = \tanh(x_i) = \frac{\sinh(x_i)}{\cosh(x_i)} = \frac{(\exp(x) - \exp(-x))/2}{\exp(x) + \exp(-x))/2} 
+$$
+
+$$
+\frac{dy_i}{dx_i} = \frac{(\exp(x) + \exp(-x))(\exp(x) + \exp(-x)) - (\exp(x) - \exp(-x))(\exp(x) - \exp(-x))}{(\exp(x) + \exp(-x))^2} = 1 - \frac{\sinh^2(x)}{\cosh^2(x)} = 1 - \tanh^2(x)
+$$
+
 
 ## Loss Functions
 
