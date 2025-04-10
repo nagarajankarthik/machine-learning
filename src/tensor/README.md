@@ -83,10 +83,29 @@ $$
 y_i = \tanh(x_i) = \frac{\sinh(x_i)}{\cosh(x_i)} = \frac{(\exp(x) - \exp(-x))/2}{\exp(x) + \exp(-x))/2} 
 $$
 
+Back-propagation:
+
 $$
-\frac{dy_i}{dx_i} = \frac{(\exp(x) + \exp(-x))(\exp(x) + \exp(-x)) - (\exp(x) - \exp(-x))(\exp(x) - \exp(-x))}{(\exp(x) + \exp(-x))^2} = 1 - \frac{\sinh^2(x)}{\cosh^2(x)} = 1 - \tanh^2(x)
+\frac{dy_i}{dx_i} = \frac{(\exp(x_i) + \exp(-x_i))(\exp(x_i) + \exp(-x_i)) - (\exp(x_i) - \exp(-x_i))(\exp(x_i) - \exp(-x_i))}{(\exp(x_i) + \exp(-x_i))^2} = 1 - \frac{\sinh^2(x_i)}{\cosh^2(x_i)} = 1 - \tanh^2(x_i) = 1 - y_i^2
 $$
 
+### Softmax
+
+Forward pass:
+
+$$
+y_j = \frac{\exp(x_j)}{\sum_{k} \exp(x_k)}
+$$
+
+Back-propagation:
+
+$$
+\frac{\partial L}{\partial x_i} = \sum_j \frac{\partial L}{\partial y_j} \frac{\partial y_j}{\partial x_i} = \sum_j \frac{\partial L}{\partial y_j} \frac{\delta_{ij} \exp(x_j)\sum_{s} \exp(x_s) - \exp(x_j)\exp(x_i)}{\sum_{s} \exp(x_s) \sum_{t} \exp(x_t)} = \sum_j \frac{\partial L}{\partial y_j} (\delta_{ij} \frac{\exp(x_j)}{\sum_{t} \exp(x_t)} - \frac{\exp(x_j)}{\sum_s \exp(x_s)} \frac{\exp(x_i)}{\sum_t \exp(x_t)})
+$$
+
+$$
+\frac{\partial L}{\partial x_i} = \sum_j \frac{\partial L}{\partial y_j} (\delta_{ij} y_j - y_i y_j) = \frac{\partial L}{\partial y_i} y_i - \sum_j \frac{\partial L}{\partial y_j} y_i y_j = y_i(\frac{\partial L}{\partial y_i} - \sum_j \frac{\partial L}{\partial y_j} y_j)
+$$
 
 ## Loss Functions
 
