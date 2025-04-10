@@ -20,6 +20,10 @@ Adds corresponding matrices of two input tensors. The two tensors must have the 
 
 Multiplies corresponding matrices of two input tensors. The two tensors must have the same shape, unless they can be broadcast against one another, following the same rules as those used in [PyTorch](https://pytorch.org/docs/stable/notes/broadcasting.html).
 
+## Concatenation
+
+Concatenates two tensors along the specified dimension. The two tensors must have the same size for all other dimensions.
+
 ## Activation Functions
 
 Activation functions are applied separately to each column of every matrix comprising the input tensor. The output and input tensors have the same shape. In the following sections, $\mathbf{x}$ and $\mathbf{y}$ are used to denote the inputs and outputs of an activation function operation. They are both column vectors.
