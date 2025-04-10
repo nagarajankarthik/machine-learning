@@ -111,4 +111,37 @@ $$
 
 ### Cross Entropy
 
+The cross entropy (CE) loss is used when the target variable is categorical.
+
+Assume there are $C$ classes for a particular categorical variable. The ground truth values are denoted as $t_i$, where $1 \le i \le C$. The value of $t_i$ is 1 for a single value of $i \in [1, C]$ and zero for all other values of $i$. A neural network typically predicts the probability of membership, $p_i$, for each category. They satisfy $\sum_{i = 1}^C p_i = 1$. The cross-entropy loss, CE, is [defined](https://medium.com/@chris.p.hughes10/a-brief-overview-of-cross-entropy-loss-523aa56b75d5) as
+
+$$
+\text{CE} = - \sum_{i = 1}^C t_i \log(p_i)
+$$
+
+During back-propagation, one evaluates 
+
+$$
+\frac{\partial \text{CE}}{\partial p_i} = - \sum_{i = 1}^C \frac{t_i}{p_i} 
+$$
+
+Note that only one term comprising the sum on the right side will be non-zero.
+
+
 ### Mean Squared Error
+
+The mean squared error (MSE) loss should be used when predicting the value of a continuous variable. It is defined as 
+
+$$
+MSE = \sum_{i} (p_i - t_i)^2 
+$$
+
+where $p_i$ denotes the predicted value of variable $i$ and $t_i$ denotes the corresponding ground truth value.
+
+During back-propagation, one evaluates 
+
+$$
+\frac{\partial \text{MSE}}{\partial p_i} =  2 (p_i - t_i) 
+$$
+
+Note the order of the variables in the above equation. If $p_i > t_i$$, increasing $p_i$ results in MSE increasing. This implies $\frac{\partial \text{MSE}}{\partial p_i} > 0$. Conversely, increasing $p_i$ reduces MSE whenever $p_i < t_i$. In this case, $\frac{\partial \text{MSE}}{\partial p_i} < 0$.
