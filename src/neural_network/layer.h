@@ -14,26 +14,21 @@ class Layer {
       public:
 	// Random seed
 	int random_seed = 0;
+
 	// Random generator
 	std::mt19937 random_generator;
 
-	Layer() { random_generator = std::mt19937(random_seed); };
-	virtual shared_ptr<Tensor> forward(shared_ptr<Tensor> input) = 0;
-
-      protected:
-	shared_ptr<Tensor> weights_bias = nullptr;
-};
-
-class FullConnectedLayer : public Layer {
-      public:
 	// Number of input values
 	int number_inputs = 0;
 
 	// Number of output values. Equal to number of nodes in layer.
 	int number_outputs = 0;
-	FullConnectedLayer(int number_inputs, int number_outputs,
-			   string init_method, shared_ptr<Logger> logger)
-	    : number_inputs(number_inputs), number_outputs(number_outputs) {
+
+	Layer(int seed, int number_inputs, int number_outputs,
+	      string init_method, shared_ptr<Logger> logger)
+	    : random_seed(seed), number_inputs(number_inputs),
+	      number_outputs(number_outputs) {
+		random_generator = std::mt19937(random_seed);
 
 		// Initialize weights
 		int number_weights = number_inputs * number_outputs;
@@ -43,14 +38,6 @@ class FullConnectedLayer : public Layer {
 		vector<int> weights_bias_shape{1, number_outputs,
 					       1 + number_inputs};
 		vector<double> weights_bias_values(number_values, 0.0);
-
-		double init_limit =
-		    init_method == "glorot"
-			? sqrt(6.0 / (number_inputs + number_outputs))
-			: 1.0;
-		variant<normal_distribution<double>,
-			uniform_real_distribution<double>>
-		    distribution;
 
 		variant<normal_distribution<double>,
 			uniform_real_distribution<double>>
@@ -95,11 +82,24 @@ class FullConnectedLayer : public Layer {
 		weights_bias = make_shared<Tensor>(weights_bias_values,
 						   weights_bias_shape, logger);
 	};
+	virtual shared_ptr<Tensor> forward(shared_ptr<Tensor> input) = 0;
+
+      protected:
+	shared_ptr<Tensor> weights_bias = nullptr;
+};
+
+class FullConnectedLayer : public Layer {
+      public:
+	FullConnectedLayer(int random_seed, int number_inputs,
+			   int number_outputs, string init_method,
+			   shared_ptr<Logger> logger)
+	    : Layer(random_seed, number_inputs, number_outputs, init_method,
+		    logger) {}
 
 	/**
 	 * Function to calculate outputs
-	 * @param input
-	 * @return
+	 * @param input: Input tensor to layer
+	 * @return: Output tensor
 	 */
 	shared_ptr<Tensor> forward(shared_ptr<Tensor> input) override {
 		int input_columns = input->shape[input->shape.size() - 1];
