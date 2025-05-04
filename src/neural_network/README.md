@@ -19,5 +19,5 @@ $$
 The convolution of a 2D matrix, $\mathbf{I} \in \mathbb{R}^{W \times H}$, with a 2D kernel, $\mathbf{k} \in \mathbb{R}^{F \times F}$, with stride, $S$, can be mathematically represented as
 
 $$
-\mathbf{R}(i,j) = \sum_{a=0}^{F-1} \sum_{b=0}^{F-1} \mathbf{I}(iS + a, jS + b) \mathbf{k}(a,b) \quad 0 \le i \le \frac{W-F}{S}, \quad 0 \le j \le \frac{H-F}{S} 
+\mathbf{R}(i,j) = \sum_{a=0}^{F-1} \sum_{b=0}^{F-1} \mathbf{I}(iS + a, jS + b) \mathbf{k}(a,b) \quad 0 \le i \le \lfloor \frac{W-F}{S} \rfloor, \quad 0 \le j \le \lfloor \frac{H-F}{S} \rfloor 
 $$
