@@ -72,5 +72,25 @@ $$
 = \sum_{a' = 0}^{F - 1} \sum_{b' = 0}^{F - 1} \frac{\partial L}{\partial \mathbf{R}(x - (F - 1) + a', y - (F - 1) + b')} \mathbf{k}((F - 1) - a', (F - 1) -  b') \\
 $$
 
-The above equation still cannot be interpreted as a convolution since the sum cannot be taken over all values of $a'$ and $b'$ for certain values of $x$ and $y$. For example, $a'$ can only be $F - 1$ when $x = 0$ and $b'$ can only be $F - 1$ when $y = 0$. This shortcoming can be remedied by the introduction of padding of $F - 1$ at both ends of the matrix $\mathbf{R}$. 
-The incorporation of padding of $F - 1$ at both ends of the matrix $\mathbf{R}$ ensures that   
+The above equation still cannot be interpreted as a convolution since the sum cannot be taken over all values of $a'$ and $b'$ for certain values of $x$ and $y$. For example, $a'$ can only be $F - 1$ when $x = 0$ and $b'$ can only be $F - 1$ when $y = 0$. This shortcoming can be remedied by the introduction of padding of $F - 1$ at both ends of the matrix $\mathbf{R}$.
+
+This implies that $x$ is replaced by $ x + (F - 1)$ and $y$ is replaced by $y + (F - 1)$. The above equation becomes
+
+$$
+\frac{\partial L}{\partial \mathbf{I}(x, y)} 
+= \sum_{a = 0}^{F - 1} \sum_{b = 0}^{F - 1} \frac{\partial L}{\partial \mathbf{R}(x + a, y + b)} \mathbf{k}_r(a, b) \\
+$$
+
+, where $a'$ and $b'$ have been replaced with $a$ and $b$ for notational convenience. Also, $\mathbf{k}_r(a, b)$ is defined as $\mathbf{k}((F - 1) - a, (F - 1) - b)$.
+
+The incorporation of padding of $F - 1$ at both ends of the matrix $\mathbf{R}$ ensures that the indices into $\frac{\partial L}{\partial \mathbf{R}}$ are always valid.
+Notice that the last equation is now of the same form as the first equation in this section defining the convolution operation. 
+
+Finally, the partial derivative of loss with respect to the kernel is given by 
+
+$$
+\frac{\partial L}{\partial \mathbf{k}(c, d)} = \sum_{i=0}^{W - F} \sum_{j=0}^{H - F} \frac{\partial L}{\partial \mathbf{R}(i, j)} \frac{\partial \mathbf{R}(i, j)}{\partial \mathbf{k}(c, d)} \\
+= \sum_{i=0}^{W - F} \sum_{j=0}^{H - F} \frac{\partial L}{\partial \mathbf{R}(i, j)} \mathbf{I}(iS + c, jS + d) \\
+$$
+
+, which is a convolution of the input with the gradient of the loss with respect to the output.
