@@ -44,10 +44,8 @@ In the last expression, the sum over $a$ and $b$ is taken only in cases where $\
 
 To formulate the backward pass in terms of convolutions, the following two changes will be made:
 
-\begin{itemize}
-    \item The stride, $S$, will be replaced with a dilation coefficient, $d$.
-    \item A padding of $F-1$ will be added to the result of the convolution at both ends of the resulting matrix.
-\end{itemize}
+1. The stride, $S$, will be replaced with a dilation coefficient, $d$.
+2. A padding of $F-1$ will be added to the result of the convolution at both ends of the resulting matrix.
 
 As per the first change, the expression for convolution can be re-written as 
 
@@ -74,7 +72,7 @@ $$
 
 The above equation still cannot be interpreted as a convolution since the sum cannot be taken over all values of $a'$ and $b'$ for certain values of $x$ and $y$. For example, $a'$ can only be $F - 1$ when $x = 0$ and $b'$ can only be $F - 1$ when $y = 0$. This shortcoming can be remedied by the introduction of padding of $F - 1$ at both ends of the matrix $\mathbf{R}$.
 
-This implies that $x$ is replaced by $ x + (F - 1)$ and $y$ is replaced by $y + (F - 1)$. The above equation becomes
+This implies that $x$ is replaced by $x + (F - 1)$ and $y$ is replaced by $y + (F - 1)$. The above equation becomes
 
 $$
 \frac{\partial L}{\partial \mathbf{I}(x, y)} 
