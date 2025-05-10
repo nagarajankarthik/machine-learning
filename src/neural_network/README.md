@@ -84,6 +84,15 @@ $$
 The incorporation of padding of $F - 1$ at both ends of the matrix $\mathbf{R}$ ensures that the indices into $\frac{\partial L}{\partial \mathbf{R}}$ are always valid.
 Notice that the last equation is now of the same form as the first equation in this section defining the convolution operation. 
 
+In the actual implementation, the forward pass is performed using the first equation for the convolution operation in this sub-section that includes the stride $S$ but not the dilation factor $d$. This implies that the convolution result $R$ will have $\frac{H - F}{S} + 1$ rows and $\frac{W - F}{S} + 1$ columns. Next, dilation is performed along the width and height dimensions by inserting $S - 1$ zeros following all but the last entry. These zeros reflect the elements that were 'missed' as a result of $S$ being greater than one. Mathematically the number of elements along the width dimension changes as 
+
+$$
+\frac{W - F}{S} + 1 \implies \frac{W - F}{S} \implies W - F \implies W - F + 1
+$$
+
+
+This procedure effectively yields the vaues of $d(x + a, y + b) \frac{\partial L}{\partial \mathbf{R}(x + a, y + b)}$ by setting $\frac{\partial L}{\partial \mathbf{R}(x + a, y + b)} = 0$, whenever $d(x + a, y + b) = 0$ and leaving the remaining values unchanged. 
+
 Finally, the partial derivative of loss with respect to the kernel is given by 
 
 $$
