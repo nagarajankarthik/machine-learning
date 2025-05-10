@@ -14,7 +14,7 @@ $$
 \mathbf{z} = f(\mathbf{W} \mathbf{x} + \mathbf{b})
 $$
 
-## Convolutional Layer
+## Convolutional layer with a single channel
 
 The convolution of a 2D matrix, $\mathbf{I} \in \mathbb{R}^{W \times H}$, with a 2D kernel, $\mathbf{k} \in \mathbb{R}^{F \times F}$, with stride, $S$, can be mathematically represented as
 
@@ -117,7 +117,49 @@ $$
 = \sum_{i=0}^{W - F} \sum_{j=0}^{H - F} d(i, j) \frac{\partial L}{\partial \mathbf{R}(i, j)}  \mathbf{I}(c + i, j + d) \\
 $$
 
-, which represents a convolution with $d(i, j)*\frac{\partial L}{\partial \mathbf{R}(i, j)} $ as the filter and $\mathbf{I}(c + i, j + d)$ as the input.
+, which represents a convolution with $d(i, j)*\frac{\partial L}{\partial \mathbf{R}(i, j)}$ as the filter and $\mathbf{I}(c + i, j + d)$ as the input.
 
 
 
+## Convolutional layer with multiple channels
+
+In general, the convolution input will be a tensor with shape $(N, H, W, C)$, where $N$, $H$, $W$ and $C$ denote the numbers of training instances in the current batch, rows and columns per channel, and the number of channels respectively. Also, the filter will have dimensions of $(F, F, C)$, where $F$ is the filter size. 
+
+In such cases, the convolution operation is defined as 
+
+$$
+\mathbf{R}(i,j) = \sum_{p = 0}^{C - 1} \sum_{a=0}^{F-1} \sum_{b=0}^{F-1} \mathbf{I}(iS + a, jS + b, p) \mathbf{k}(a,b, p) + t \quad 0 \le i \le \lfloor \frac{W-F}{S} \rfloor, \quad 0 \le j \le \lfloor \frac{H-F}{S} \rfloor 
+$$
+
+As per the alternative formulation, one obtains
+
+$$
+\mathbf{R}(i,j) = d(i, j) \sum_{p = 0}^{C - 1} \sum_{a=0}^{F-1} \sum_{b=0}^{F-1} \mathbf{I}(i + a, j + b, p) \mathbf{k}(a,b, p) + t \quad 0 \le i \le W - F , \quad 0 \le j \le H - F , \quad d(i, j) = \begin{cases} 1 & \text{if } \mod(i, S) = 0 \text{ and } \mod(j, S) = 0 \\ 0 & \text{otherwise} \end{cases}
+$$
+
+The gradients are given by
+
+$$
+\frac{\partial L}{\partial \mathbf{I}(x, y, r)} = \sum_{p = 0}^{C - 1} \sum_{i=0}^{W - F} \sum_{j = 0}^{H - F} \frac{\partial L}{\partial \mathbf{R}(i, j)}\frac{\partial \mathbf{R}(i, j)}{\partial \mathbf{I}(x, y, r)} \\
+= \sum_{i=0}^{W - F} \sum_{j=0}^{H - F} d(i, j) \frac{\partial L}{\partial \mathbf{R}(i, j)} \sum_{p = 0}^{C - 1} \sum_{a=0}^{F-1} \sum_{b=0}^{F-1} \delta_{i + a, x} \delta_{j + b, y} \delta_{r, p} \mathbf{k}(a, b, p) \\
+= \sum_{a=0}^{F-1} \sum_{b=0}^{F-1} d(x - a, y - b) \frac{\partial L}{\partial \mathbf{R}(x - a, y - b)} \mathbf{k}(a, b, r) 
+$$
+
+
+Performing the same steps as above yields
+
+$$
+\frac{\partial L}{\partial \mathbf{I}(x, y, r)} 
+= \sum_{a = 0}^{F - 1} \sum_{b = 0}^{F - 1} d(x + a, y + b) \frac{\partial L}{\partial \mathbf{R}(x + a, y + b)} \mathbf{k}_r(a, b, r) \\
+$$
+
+which can again be interpreted as a convolution with a flipped kernel. 
+
+
+Similarly, 
+
+$$
+\frac{\partial L}{\partial \mathbf{k}(c, d, r)} = \sum_{i=0}^{W - F} \sum_{j = 0}^{H - F} \frac{\partial L}{\partial \mathbf{R}(i, j)}\frac{\partial \mathbf{R}(i, j)}{\partial \mathbf{k}(c, d, r)} \\
+= \sum_{i=0}^{W - F} \sum_{j=0}^{H - F} d(i, j) \frac{\partial L}{\partial \mathbf{R}(i, j)} \sum_{p = 0}^{C - 1}\sum_{a=0}^{F-1} \sum_{b=0}^{F-1} \mathbf{I}(i + a, j + b, p) \delta_{a, c} \delta_{j, d} \delta_{p, r} \\
+= \sum_{i=0}^{W - F} \sum_{j=0}^{H - F} d(i, j) \frac{\partial L}{\partial \mathbf{R}(i, j)}  \mathbf{I}(c + i, j + d, r) \\
+$$
