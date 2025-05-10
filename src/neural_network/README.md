@@ -163,3 +163,9 @@ $$
 = \sum_{i=0}^{W - F} \sum_{j=0}^{H - F} d(i, j) \frac{\partial L}{\partial \mathbf{R}(i, j)} \sum_{p = 0}^{C - 1}\sum_{a=0}^{F-1} \sum_{b=0}^{F-1} \mathbf{I}(i + a, j + b, p) \delta_{a, c} \delta_{j, d} \delta_{p, r} \\
 = \sum_{i=0}^{W - F} \sum_{j=0}^{H - F} d(i, j) \frac{\partial L}{\partial \mathbf{R}(i, j)}  \mathbf{I}(c + i, j + d, r) \\
 $$
+
+References:
+
+- [Carnegie Mellon University Notes](https://deeplearning.cs.cmu.edu/F21/document/recitation/Recitation5/CNN_Backprop_Recitation_5_F21.pdf)
+- [Stanford CS231n](https://cs231n.github.io/convolutional-networks/)
+- [Medium Article](https://pavisj.medium.com/convolutions-and-backpropagations-46026a8f5d2c)
