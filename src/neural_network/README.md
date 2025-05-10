@@ -96,8 +96,28 @@ This procedure effectively yields the vaues of $d(x + a, y + b) \frac{\partial L
 Finally, the partial derivative of loss with respect to the kernel is given by 
 
 $$
-\frac{\partial L}{\partial \mathbf{k}(c, d)} = \sum_{i=0}^{W - F} \sum_{j=0}^{H - F} \frac{\partial L}{\partial \mathbf{R}(i, j)} \frac{\partial \mathbf{R}(i, j)}{\partial \mathbf{k}(c, d)} \\
-= \sum_{i=0}^{W - F} \sum_{j=0}^{H - F} \frac{\partial L}{\partial \mathbf{R}(i, j)} \mathbf{I}(iS + c, jS + d) \\
+\frac{\partial L}{\partial \mathbf{k}(c, d)} = \sum_{i=0}^{\lfloor \frac{W - F}{S} \rfloor} \sum_{j=0}^{\lfloor \frac{H - F}{S} \rfloor} \frac{\partial L}{\partial \mathbf{R}(i, j)} \frac{\partial \mathbf{R}(i, j)}{\partial \mathbf{k}(c, d)} \\
+= \sum_{i=0}^{\lfloor \frac{W - F}{S} \rfloor} \sum_{j=0}^{\lfloor \frac{H - F}{S} \rfloor} \frac{\partial L}{\partial \mathbf{R}(i, j)} \mathbf{I}(iS + c, jS + d)
 $$
 
-, which is a convolution of the input with the gradient of the loss with respect to the output.
+In the special case $S = 1$, the above equation reduces to 
+
+$$
+\frac{\partial L}{\partial \mathbf{k}(c, d)} = \sum_{i=0}^{W - F} \sum_{j=0}^{ H - F} \frac{\partial L}{\partial \mathbf{R}(i, j)} \frac{\partial \mathbf{R}(i, j)}{\partial \mathbf{k}(c, d)} \\
+= \sum_{i=0}^{W - F} \sum_{j=0}^{ H - F} \frac{\partial L}{\partial \mathbf{R}(i, j)} \mathbf{I}(c + i, d + j) 
+$$
+
+, which is a convolution of the input with the partial derivative of the loss with respect to the output.
+
+If $S > 1$, one follows the same procedure as above with the only difference being that differentiation is performed with respect to the filter instead of the input. This yields 
+
+$$
+\frac{\partial L}{\partial \mathbf{k}(c, d)} = \sum_{i=0}^{W - F} \sum_{j = 0}^{H - F} \frac{\partial L}{\partial \mathbf{R}(i, j)}\frac{\partial \mathbf{R}(i, j)}{\partial \mathbf{k}(c, d)} \\
+= \sum_{i=0}^{W - F} \sum_{j=0}^{H - F} d(i, j) \frac{\partial L}{\partial \mathbf{R}(i, j)} \sum_{a=0}^{F-1} \sum_{b=0}^{F-1} \mathbf{I}(i + a, j + b) \delta_{a, c} \delta_{j, d} \\
+= \sum_{i=0}^{W - F} \sum_{j=0}^{H - F} d(i, j) \frac{\partial L}{\partial \mathbf{R}(i, j)}  \mathbf{I}(c + i, j + d) \\
+$$
+
+, which represents a convolution with $d(i, j)*\frac{\partial L}{\partial \mathbf{R}(i, j)} $ as the filter and $\mathbf{I}(c + i, j + d)$ as the input.
+
+
+
