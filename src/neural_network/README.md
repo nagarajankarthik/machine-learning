@@ -167,5 +167,6 @@ $$
 References:
 
 - [Carnegie Mellon University Notes](https://deeplearning.cs.cmu.edu/F21/document/recitation/Recitation5/CNN_Backprop_Recitation_5_F21.pdf)
-- [Stanford CS231n](https://cs231n.github.io/convolutional-networks/)
+- [Stanford CS231n lecture notes (html)](https://cs231n.github.io/convolutional-networks/)
+- [Stanford CS231n lecture notes (slides)](https://cs231n.stanford.edu/slides/2016/winter1516_lecture11.pdf)
 - [Medium Article](https://pavisj.medium.com/convolutions-and-backpropagations-46026a8f5d2c)
