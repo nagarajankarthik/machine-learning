@@ -528,6 +528,75 @@ inline shared_ptr<Tensor> concatenate_forward(shared_ptr<Tensor> t1,
 	return t3;
 }
 
+inline vector<double> get_values_at_index(int width_start, int height_start,
+					  shared_ptr<Tensor> input,
+					  int kernel_size, int padding,
+					  int dilation) {
+	vector<double> values{};
+	int height_input = input->shape[2];
+	int width_input = input->shape[3];
+	for (int p = 0; p < input->shape[1]; p++) {
+		for (int l = height_start; l < height_start + kernel_size;
+		     l++) {
+			for (int k = width_start; k < width_start + kernel_size;
+			     k++) {
+
+				if (k < padding || l < padding ||
+				    k > padding +
+					    (width_input - 1) * dilation ||
+				    l > padding + (height_input - 1) * dilation)
+					values.push_back(0);
+
+				else if ((l - padding) % dilation != 0 ||
+					 (k - padding) % dilation != 0)
+					values.push_back(0);
+				else {
+
+					int i = (l - padding) / dilation;
+					int j = (k - padding) / dilation;
+					vector<int> required_index = {0, p, i,
+								      j};
+					values.push_back(
+					    input->get_element(required_index));
+				}
+			}
+		}
+	}
+	return values;
+}
+
+/**
+ * Function to perform convolution
+ * @param input: Tensor with shape (batch_size, channels, height, width)
+ * @param kernel: Tensor with shape (channels, kernel_height, kernel_width).
+ * @param stride: Stride of the convolution.
+ * @param padding: Padding of the convolution.
+ * @param dilation: Dilation of the convolution.
+ * @return conv_result: Tensor with shape (batch_size, (height -
+ * kernel_height)/stride + 1, (width - kernel_width)/stride + 1)
+ */
+inline shared_ptr<Tensor> convolution(shared_ptr<Tensor> input,
+				      shared_ptr<Tensor> kernel, int stride = 1,
+				      int padding = 0, int dilation = 1) {
+	shared_ptr<Logger> logger = input->logger;
+
+	// Update input to account for padding and dilation
+	int kernel_size = kernel->shape[0];
+	int channels = input->shape[3];
+	int height_input = input->shape[1];
+	int width_input = input->shape[2];
+	int width_effective = 1 + (width_input - 1) * dilation + 2 * padding;
+	int height_effective = 1 + (height_input - 1) * dilation + 2 * padding;
+	int width_output = 1 + (width_effective - kernel_size) / stride;
+	int height_output = 1 + (height_effective - kernel_size) / stride;
+	for (int i = 0; i < width_effective; i++) {
+		for (int j = 0; j < height_effective; j++) {
+			vector<double> current_values = get_values_at_index(
+			    i, j, input, kernel_size, padding, dilation);
+		}
+	}
+}
+
 // Activation functions
 inline void relu_backward(shared_ptr<Tensor> t3) {
 
