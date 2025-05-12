@@ -91,7 +91,7 @@ $$
 $$
 
 
-This procedure effectively yields the vaues of $d(x + a, y + b) \frac{\partial L}{\partial \mathbf{R}(x + a, y + b)}$ by setting $\frac{\partial L}{\partial \mathbf{R}(x + a, y + b)} = 0$, whenever $d(x + a, y + b) = 0$ and leaving the remaining values unchanged. 
+This procedure effectively yields the values of $d(x + a, y + b) \frac{\partial L}{\partial \mathbf{R}(x + a, y + b)}$ by setting $\frac{\partial L}{\partial \mathbf{R}(x + a, y + b)} = 0$, whenever $d(x + a, y + b) = 0$ and leaving the remaining values unchanged. 
 
 Finally, the partial derivative of loss with respect to the kernel is given by 
 
