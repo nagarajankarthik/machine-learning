@@ -583,14 +583,16 @@ inline shared_ptr<Tensor> convolution(shared_ptr<Tensor> input,
 	// Update input to account for padding and dilation
 	int kernel_size = kernel->shape[0];
 	int channels = input->shape[3];
+	int batch_size = input->shape[0];
 	int height_input = input->shape[1];
 	int width_input = input->shape[2];
 	int width_effective = 1 + (width_input - 1) * dilation + 2 * padding;
 	int height_effective = 1 + (height_input - 1) * dilation + 2 * padding;
 	int width_output = 1 + (width_effective - kernel_size) / stride;
 	int height_output = 1 + (height_effective - kernel_size) / stride;
-	for (int i = 0; i < width_effective; i++) {
-		for (int j = 0; j < height_effective; j++) {
+	vector<double> weights(batch_size * height_output * width_output, 0.);
+	for (int i = 0; i < width_effective; i += stride) {
+		for (int j = 0; j < height_effective; j += stride) {
 			vector<double> current_values = get_values_at_index(
 			    i, j, input, kernel_size, padding, dilation);
 		}
