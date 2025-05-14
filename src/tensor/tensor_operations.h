@@ -528,7 +528,8 @@ inline shared_ptr<Tensor> concatenate_forward(shared_ptr<Tensor> t1,
 	return t3;
 }
 
-inline vector<double> get_values_at_index(int width_start, int height_start,
+inline vector<double> get_values_at_index(int batch, int width_start,
+					  int height_start,
 					  shared_ptr<Tensor> input,
 					  int kernel_size, int padding,
 					  int dilation) {
@@ -554,8 +555,8 @@ inline vector<double> get_values_at_index(int width_start, int height_start,
 
 					int i = (l - padding) / dilation;
 					int j = (k - padding) / dilation;
-					vector<int> required_index = {0, p, i,
-								      j};
+					vector<int> required_index = {batch, p,
+								      i, j};
 					values.push_back(
 					    input->get_element(required_index));
 				}
@@ -590,13 +591,35 @@ inline shared_ptr<Tensor> convolution(shared_ptr<Tensor> input,
 	int height_effective = 1 + (height_input - 1) * dilation + 2 * padding;
 	int width_output = 1 + (width_effective - kernel_size) / stride;
 	int height_output = 1 + (height_effective - kernel_size) / stride;
-	vector<double> weights(batch_size * height_output * width_output, 0.);
-	for (int i = 0; i < width_effective; i += stride) {
-		for (int j = 0; j < height_effective; j += stride) {
-			vector<double> current_values = get_values_at_index(
-			    i, j, input, kernel_size, padding, dilation);
+	vector<double> weights_values(batch_size * height_output *
+					  width_output * kernel_size *
+					  kernel_size * channels,
+				      0.);
+	for (int b = 0; b < batch_size; b++) {
+		for (int i = 0; i < height_output; i++) {
+			for (int j = 0; j < width_output; j++) {
+				vector<double> current_values =
+				    get_values_at_index(
+					b, j * stride, i * stride, input,
+					kernel_size, padding, dilation);
+				int offset =
+				    b * height_output * width_output *
+					kernel_size * kernel_size * channels +
+				    i * width_output * kernel_size *
+					kernel_size * channels +
+				    j * kernel_size * kernel_size * channels;
+				for (int k = 0; k < current_values.size();
+				     k++) {
+					weights_values[offset + k] =
+					    current_values[k];
+				}
+			}
 		}
 	}
+	vector<int> weights_shape{kernel_size * kernel_size * channels,
+				  batch_size * height_output * width_output};
+	shared_ptr<Tensor> weights =
+	    make_shared<Tensor>(weights_values, weights_shape, logger);
 }
 
 // Activation functions
