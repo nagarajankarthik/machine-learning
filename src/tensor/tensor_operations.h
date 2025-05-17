@@ -656,31 +656,31 @@ namespace ml
 	inline vector<double> get_values_at_index(int batch, int width_start,
 											  int height_start,
 											  shared_ptr<Tensor> input,
-											  int kernel_size, int padding,
-											  int dilation)
+											  int dilated_kernel_size, int padding,
+											  int dilation_input)
 	{
 		vector<double> values{};
 		int height_input = input->shape[1];
 		int width_input = input->shape[2];
 
-		for (int l = height_start; l < height_start + kernel_size; l++)
+		for (int l = height_start; l < height_start + dilated_kernel_size; l++)
 		{
-			for (int k = width_start; k < width_start + kernel_size; k++)
+			for (int k = width_start; k < width_start + dilated_kernel_size; k++)
 			{
-				for (int p = 0; p < input->shape[1]; p++)
+				for (int p = 0; p < input->shape[3]; p++)
 				{
 					if (k < padding || l < padding ||
-						k > padding + (width_input - 1) * dilation ||
-						l > padding + (height_input - 1) * dilation)
+						k > padding + (width_input - 1) * dilation_input ||
+						l > padding + (height_input - 1) * dilation_input)
 						values.push_back(0);
 
-					else if ((l - padding) % dilation != 0 ||
-							 (k - padding) % dilation != 0)
+					else if ((l - padding) % dilation_input != 0 ||
+							 (k - padding) % dilation_input != 0)
 						values.push_back(0);
 					else
 					{
-						int i = (l - padding) / dilation;
-						int j = (k - padding) / dilation;
+						int i = (l - padding) / dilation_input;
+						int j = (k - padding) / dilation_input;
 						vector<int> required_index = {batch, p, i, j};
 						values.push_back(input->get_element(required_index));
 					}
@@ -703,7 +703,8 @@ namespace ml
 	 */
 	inline shared_ptr<Tensor> convolution(shared_ptr<Tensor> input,
 										  shared_ptr<Tensor> kernel, int stride = 1,
-										  int padding = 0, int dilation = 1)
+										  int padding = 0, int dilation_input = 1,
+										  int dilation_kernel = 1)
 	{
 		shared_ptr<Logger> logger = input->logger;
 
@@ -714,12 +715,14 @@ namespace ml
 		int batch_size = input->shape[0];
 		int height_input = input->shape[1];
 		int width_input = input->shape[2];
-		int width_effective = 1 + (width_input - 1) * dilation + 2 * padding;
-		int height_effective = 1 + (height_input - 1) * dilation + 2 * padding;
-		int width_output = 1 + (width_effective - kernel_size) / stride;
-		int height_output = 1 + (height_effective - kernel_size) / stride;
+		int width_effective = 1 + (width_input - 1) * dilation_input + 2 * padding;
+		int height_effective = 1 + (height_input - 1) * dilation_input + 2 * padding;
+		int width_output = 1 + (width_effective - dilation_kernel * kernel_size) / stride;
+		int height_output = 1 + (height_effective - dilation_kernel * kernel_size) / stride;
+
+		int dilated_kernel_size = dilation_kernel * kernel_size;
 		vector<double> data_values(batch_size * height_output * width_output *
-									   kernel_size * kernel_size * channels,
+									   dilated_kernel_size * dilated_kernel_size * channels,
 								   0.);
 		for (int b = 0; b < batch_size; b++)
 		{
@@ -730,13 +733,13 @@ namespace ml
 					vector<double> current_values =
 						get_values_at_index(
 							b, j * stride, i * stride, input,
-							kernel_size, padding, dilation);
+							dilated_kernel_size, padding, dilation_input);
 					int offset =
 						b * height_output * width_output *
-							kernel_size * kernel_size * channels +
-						i * width_output * kernel_size *
-							kernel_size * channels +
-						j * kernel_size * kernel_size * channels;
+							dilated_kernel_size * dilated_kernel_size * channels +
+						i * width_output * dilated_kernel_size *
+							dilated_kernel_size * channels +
+						j * dilated_kernel_size * dilated_kernel_size * channels;
 					for (int k = 0; k < current_values.size();
 						 k++)
 					{
@@ -748,31 +751,39 @@ namespace ml
 		}
 
 		vector<int> data_shape{batch_size * height_output * width_output,
-							   kernel_size * kernel_size * channels};
+							   dilated_kernel_size * dilated_kernel_size * channels};
 		shared_ptr<Tensor> data =
 			make_shared<Tensor>(data_values, data_shape, logger);
 
 		vector<double> weights_values(
-			number_filters * kernel_size * kernel_size * channels, 0.);
+			number_filters * dilated_kernel_size * dilated_kernel_size * channels, 0.);
 		vector<int> weights_shape{
-			kernel_size * kernel_size * channels,
+			dilated_kernel_size * dilated_kernel_size * channels,
 			number_filters,
 		};
 
-		for (int j = 0; j < kernel_size; j++)
+		for (int j = 0; j < dilation_kernel * kernel_size; j++)
 		{
-			for (int i = 0; i < kernel_size; i++)
+			for (int i = 0; i < dilation_kernel * kernel_size; i++)
 			{
 				for (int c = 0; c < channels; c++)
 				{
 					for (int f = 0; f < number_filters; f++)
 					{
 						int offset =
-							j * kernel_size * channels * number_filters +
+							j * dilated_kernel_size * channels * number_filters +
 							i * channels * number_filters +
 							c * number_filters + f;
-						weights_values[offset] =
-							kernel->get_element({f, j, i, c});
+						if (j % dilation_kernel != 0 ||
+							i % dilation_kernel != 0)
+							weights_values[offset] = 0;
+						else
+						{
+							int j_ = j / dilation_kernel;
+							int i_ = i / dilation_kernel;
+							weights_values[offset] =
+								kernel->get_element({f, j_, i_, c});
+						}
 					}
 				}
 			}
