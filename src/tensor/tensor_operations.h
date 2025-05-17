@@ -626,22 +626,27 @@ namespace ml
 		}
 	}
 
-	void convolution_backward(shared_ptr<Tensor> convolution_result)
+	/**
+	 * Function to perform backward pass of convolution operation
+	 * @param convolution_result: Tensor with shape (batch_size,
+	 * height_output, width_output, num_filters).
+	 * @param stride: Stride of the convolution for forward pass.
+	 */
+	void convolution_backward(shared_ptr<Tensor> convolution_result, int stride = 1)
 	{
+
 		shared_ptr<Tensor> gradient_tensor = make_shared<Tensor>(convolution_result->gradients,
 																 convolution_result->shape,
 																 convolution_result->logger);
 		shared_ptr<Tensor> convolution_input = convolution_result->input_first;
 		shared_ptr<Tensor> convolution_kernel = convolution_result->input_second;
-		// flip kernel
 		flip_kernel(convolution_kernel);
-		// TODO: Find a way to retrieve stride used to perform initial convolution.
-		//  Set dilation factor to this value of stride.
+
 		shared_ptr<Tensor> input_gradients = convolution(gradient_tensor,
 														 convolution_kernel,
 														 1,
 														 convolution_kernel->shape[1] - 1,
-														 1);
+														 stride, 1);
 		convolution_input->gradients = input_gradients->values;
 
 		flip_kernel(convolution_kernel);
@@ -650,7 +655,7 @@ namespace ml
 														  convolution_input,
 														  1,
 														  convolution_kernel->shape[1] - 1,
-														  1);
+														  1, stride);
 	}
 
 	inline vector<double> get_values_at_index(int batch, int width_start,
@@ -804,7 +809,11 @@ namespace ml
 		convolution_result->reshape({batch_size, height_output, width_output, number_filters});
 		convolution_result->input_first = input;
 		convolution_result->input_second = kernel;
-		convolution_result->backward_function = convolution_backward;
+		auto conv_back = [stride](shared_ptr<Tensor> t3)
+		{
+			concatenate_backward(t3, stride);
+		};
+		convolution_result->backward_function = conv_back;
 		return convolution_result;
 	}
 
