@@ -599,6 +599,60 @@ namespace ml
 		return t3;
 	}
 
+	/**
+	 * Function to flip kernel in-place
+	 * @param kernel: Tensor with shape (num_filters, kernel_height,
+	 * kernel_width, channels).
+	 */
+	void flip_kernel(shared_ptr<Tensor> kernel)
+	{
+		vector<int> kernel_shape = kernel->shape;
+		int height = kernel_shape[1];
+		int width = kernel_shape[2];
+		for (int f = 0; f < kernel_shape[0]; f++)
+		{
+			for (int c = 0; c < kernel_shape[3]; c++)
+			{
+				for (int j = 0; j < kernel_shape[1]; j++)
+				{
+					for (int i = 0; i < kernel_shape[2]; i++)
+					{
+						if ((width - 1) - i < i)
+							continue;
+						kernel->set_element(vector<int>{f, j, i, c}, kernel->get_element({f, (height - 1) - j, (width - 1) - i, c}));
+					}
+				}
+			}
+		}
+	}
+
+	void convolution_backward(shared_ptr<Tensor> convolution_result)
+	{
+		shared_ptr<Tensor> gradient_tensor = make_shared<Tensor>(convolution_result->gradients,
+																 convolution_result->shape,
+																 convolution_result->logger);
+		shared_ptr<Tensor> convolution_input = convolution_result->input_first;
+		shared_ptr<Tensor> convolution_kernel = convolution_result->input_second;
+		// flip kernel
+		flip_kernel(convolution_kernel);
+		// TODO: Find a way to retrieve stride used to perform initial convolution.
+		//  Set dilation factor to this value of stride.
+		shared_ptr<Tensor> input_gradients = convolution(gradient_tensor,
+														 convolution_kernel,
+														 1,
+														 convolution_kernel->shape[1] - 1,
+														 1);
+		convolution_input->gradients = input_gradients->values;
+
+		flip_kernel(convolution_kernel);
+
+		shared_ptr<Tensor> kernel_gradients = convolution(gradient_tensor,
+														  convolution_input,
+														  1,
+														  convolution_kernel->shape[1] - 1,
+														  1);
+	}
+
 	inline vector<double> get_values_at_index(int batch, int width_start,
 											  int height_start,
 											  shared_ptr<Tensor> input,
@@ -655,7 +709,7 @@ namespace ml
 
 		// Update input to account for padding and dilation
 		int number_filters = kernel->shape[0];
-		int kernel_size = kernel->shape[2];
+		int kernel_size = kernel->shape[1];
 		int channels = input->shape[3];
 		int batch_size = input->shape[0];
 		int height_input = input->shape[1];
@@ -705,25 +759,6 @@ namespace ml
 			number_filters,
 		};
 
-		for (int c = 0; c < channels; c++)
-		{
-			for (int j = 0; j < kernel_size; j++)
-			{
-				for (int i = 0; i < kernel_size; i++)
-				{
-					for (int f = 0; f < number_filters; f++)
-					{
-						int offset =
-							c * kernel_size * kernel_size * number_filters +
-							j * kernel_size * number_filters +
-							i * number_filters + f;
-						weights_values[offset] =
-							kernel->get_element({f, c, j, i});
-					}
-				}
-			}
-		}
-
 		for (int j = 0; j < kernel_size; j++)
 		{
 			for (int i = 0; i < kernel_size; i++)
@@ -756,6 +791,9 @@ namespace ml
 			batch_matmul_forward(data, weights);
 
 		convolution_result->reshape({batch_size, height_output, width_output, number_filters});
+		convolution_result->input_first = input;
+		convolution_result->input_second = kernel;
+		convolution_result->backward_function = convolution_backward;
 		return convolution_result;
 	}
 
