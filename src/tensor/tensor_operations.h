@@ -624,7 +624,8 @@ inline vector<double> get_values_at_index(int batch, int width_start,
 /**
  * Function to perform convolution
  * @param input: Tensor with shape (batch_size, height, width, channels)
- * @param kernel: Tensor with shape (kernel_height, kernel_width, channels).
+ * @param kernel: Tensor with shape (number_filters, kernel_height,
+ * kernel_width, channels).
  * @param stride: Stride of the convolution.
  * @param padding: Padding of the convolution.
  * @param dilation: Dilation of the convolution.
@@ -639,7 +640,8 @@ inline shared_ptr<Tensor> convolution(shared_ptr<Tensor> input,
 
 	// Update input to account for padding and dilation
 	int number_filters = kernel->shape[0];
-	int kernel_size = kernel->shape[1];
+	int kernel_height = kernel->shape[1];
+	int kernel_width = kernel->shape[2];
 	int channels = input->shape[3];
 	int batch_size = input->shape[0];
 	int height_input = input->shape[1];
@@ -649,14 +651,15 @@ inline shared_ptr<Tensor> convolution(shared_ptr<Tensor> input,
 	int height_effective =
 	    1 + (height_input - 1) * dilation_input + 2 * padding;
 	int width_output =
-	    1 + (width_effective - dilation_kernel * kernel_size) / stride;
+	    1 + (width_effective - dilation_kernel * kernel_width) / stride;
 	int height_output =
-	    1 + (height_effective - dilation_kernel * kernel_size) / stride;
+	    1 + (height_effective - dilation_kernel * kernel_height) / stride;
 
-	int dilated_kernel_size = dilation_kernel * kernel_size;
+	int dilated_kernel_height = dilation_kernel * kernel_height;
+	int dilated_kernel_width = dilation_kernel * kernel_width;
 	vector<double> data_values(batch_size * height_output * width_output *
-				       dilated_kernel_size *
-				       dilated_kernel_size * channels,
+				       dilated_kernel_height *
+				       dilated_kernel_width * channels,
 				   0.);
 	for (int b = 0; b < batch_size; b++) {
 		for (int i = 0; i < height_output; i++) {
