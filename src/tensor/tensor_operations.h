@@ -534,8 +534,19 @@ void convolution_backward(shared_ptr<Tensor> convolution_result,
   // Need to perform separate convolutions for each combination of input and
   // output channels. Each output channel corresponds to a filter in the
   // convolution layer.
-  for (int f = 0; f < convolution_kernel->shape[0]; f++) {
-    for (int c = 0; c < convolution_kernel->shape[3]; c++) {
+  vector<shared_ptr<Tensor>> input_gradients_channels(
+      convolution_input->shape[3], nullptr);
+  for (int c = 0; c < convolution_kernel->shape[3]; c++) {
+    vector<double> gradient_channel_values(convolution_result->shape[0] *
+                                               convolution_result->shape[1] *
+                                               convolution_result->shape[2],
+                                           0.);
+    shared_ptr<Tensor> gradient_tensor_channel = make_shared<Tensor>(
+        gradient_channel_values,
+        vector<int>{convolution_result->shape[0], convolution_input->shape[1],
+                    convolution_input->shape[2], 1},
+        convolution_result->logger);
+    for (int f = 0; f < convolution_kernel->shape[0]; f++) {
       // Get the kernel for the current filter and channel
       vector<int> tmp{0, 0};
       vector<vector<int>> kernel_index(4, tmp);
@@ -548,10 +559,11 @@ void convolution_backward(shared_ptr<Tensor> convolution_result,
       vector<double> kernel_values{};
       convolution_kernel->get_subtensor(kernel_index, 0, 0, kernel_values);
 
-      shared_ptr<Tensor> kernel_tensor = make_shared<Tensor>(
-          kernel_values,
-          {1, convolution_kernel->shape[1], convolution_kernel->shape[2], 1},
-          convolution_kernel->logger);
+      shared_ptr<Tensor> kernel_tensor =
+          make_shared<Tensor>(kernel_values,
+                              vector<int>{1, convolution_kernel->shape[1],
+                                          convolution_kernel->shape[2], 1},
+                              convolution_kernel->logger);
       vector<vector<int>> gradient_index(kernel_index.begin(),
                                          kernel_index.end());
       gradient_index[0][1] = convolution_result->shape[0] - 1;
@@ -559,23 +571,110 @@ void convolution_backward(shared_ptr<Tensor> convolution_result,
       gradient_index[3][1] = f;
       vector<double> gradient_values{};
       gradient_tensor->get_subtensor(gradient_index, 0, 0, gradient_values);
-      shared_ptr<Tensor> gradient_subtensor = make_shared<Tensor>(
-          gradient_values,
-          {convolution_result->shape[0], convolution_result->shape[1],
-           convolution_result->shape[2], 1},
-          convolution_result->logger);
+      shared_ptr<Tensor> gradient_subtensor =
+          make_shared<Tensor>(gradient_values,
+                              vector<int>{convolution_result->shape[0],
+                                          convolution_result->shape[1],
+                                          convolution_result->shape[2], 1},
+                              convolution_result->logger);
+      // Perform convolution with the kernel and the gradient tensor
+      // shape of convolution_channel_filter is (batch_size, height, width, 1)
+      shared_ptr<Tensor> input_gradients_channel_filter =
+          convolution(gradient_subtensor, kernel_tensor, 1,
+                      convolution_kernel->shape[1] - 1, stride, 1);
+      // Add the gradients to the channel of the gradient tensor
+      for (int i = 0; i < input_gradients_channel_filter->values.size(); i++) {
+        gradient_tensor_channel->values[i] +=
+            input_gradients_channel_filter->values[i];
+      }
     }
+    input_gradients_channels[c] = gradient_tensor_channel;
+  }
+  // Concatenate the gradients for each channel to get the input gradients
+  shared_ptr<Tensor> input_gradients = input_gradients_channels[0];
+  for (int c = 1; c < input_gradients_channels.size(); c++) {
+    input_gradients =
+        concatenate_forward(input_gradients, input_gradients_channels[c], 3);
   }
 
-  shared_ptr<Tensor> input_gradients =
-      convolution(gradient_tensor, convolution_kernel, 1,
-                  convolution_kernel->shape[1] - 1, stride, 1);
   convolution_input->gradients = input_gradients->values;
 
   flip_kernel(convolution_kernel);
 
-  shared_ptr<Tensor> kernel_gradients =
-      convolution(convolution_input, gradient_tensor, 1, 0, 1, stride);
+  vector<shared_ptr<Tensor>> kernel_gradients_filters(
+      convolution_kernel->shape[0], nullptr);
+
+  for (int f = 0; f < convolution_kernel->shape[0]; f++) {
+
+    vector<shared_ptr<Tensor>> kernel_gradients_channels(
+        convolution_kernel->shape[3], nullptr);
+    for (int c = 0; c < convolution_kernel->shape[3]; c++) {
+      vector<double> gradients_filter_channel(
+          convolution_kernel->shape[1] * convolution_kernel->shape[2], 0.);
+      for (int b = 0; b < convolution_input->shape[0]; b++) {
+
+        vector<int> tmp{0, 0};
+        vector<vector<int>> gradient_index(4, tmp);
+        gradient_index[0][0] = b;
+        gradient_index[0][1] = b;
+        gradient_index[1][1] = gradient_tensor->shape[1] - 1;
+        gradient_index[2][1] = gradient_tensor->shape[2] - 1;
+        gradient_index[3][0] = f;
+        gradient_index[3][1] = f;
+        vector<double> gradient_values{};
+        gradient_tensor->get_subtensor(gradient_index, 0, 0, gradient_values);
+        shared_ptr<Tensor> gradient_subtensor =
+            make_shared<Tensor>(gradient_values,
+                                vector<int>{1, gradient_tensor->shape[1],
+                                            gradient_tensor->shape[2], 1},
+                                convolution_result->logger);
+        vector<vector<int>> convolution_input_index(4, tmp);
+        convolution_input_index[0][0] = b;
+        convolution_input_index[0][1] = b;
+        convolution_input_index[1][1] = convolution_input->shape[1] - 1;
+        convolution_input_index[2][1] = convolution_input->shape[2] - 1;
+        convolution_input_index[3][0] = c;
+        convolution_input_index[3][1] = c;
+
+        vector<double> convolution_input_values{};
+        convolution_input->get_subtensor(convolution_input_index, 0, 0,
+                                         convolution_input_values);
+        shared_ptr<Tensor> convolution_input_subtensor =
+            make_shared<Tensor>(convolution_input_values,
+                                vector<int>{1, convolution_input->shape[1],
+                                            convolution_input->shape[2], 1},
+                                convolution_result->logger);
+
+        // Perform convolution with the kernel and the gradient tensor
+        shared_ptr<Tensor> kernel_filter_gradients = convolution(
+            convolution_input_subtensor, gradient_subtensor, 1, 0, 1, stride);
+        // Add the gradients to the kernel
+        for (int i = 0; i < kernel_filter_gradients->values.size(); i++) {
+          gradients_filter_channel[i] += kernel_filter_gradients->values[i];
+        }
+      }
+      shared_ptr<Tensor> kernel_gradients_channel_single =
+          make_shared<Tensor>(gradients_filter_channel,
+                              vector<int>{convolution_kernel->shape[1],
+                                          convolution_kernel->shape[2], 1},
+                              convolution_result->logger);
+      kernel_gradients_channels[c] = kernel_gradients_channel_single;
+    }
+    shared_ptr<Tensor> kernel_gradients_filter_single =
+        kernel_gradients_channels[0];
+    for (int c = 1; c < kernel_gradients_channels.size(); c++) {
+      kernel_gradients_filter_single = concatenate_forward(
+          kernel_gradients_filter_single, kernel_gradients_channels[c], 2);
+    }
+    kernel_gradients_filters[f] = kernel_gradients_filter_single;
+  }
+
+  shared_ptr<Tensor> kernel_gradients = kernel_gradients_filters[0];
+  for (int f = 1; f < kernel_gradients_filters.size(); f++) {
+    kernel_gradients =
+        concatenate_forward(kernel_gradients, kernel_gradients_filters[f], 0);
+  }
+  convolution_kernel->gradients = kernel_gradients->values;
 }
 
 /**
@@ -588,8 +687,9 @@ void convolution_backward(shared_ptr<Tensor> convolution_result,
  * @param dilated_kernel_width: Width of the dilated kernel
  * @param padding: Padding applied to the input tensor
  * @param dilation_input: Dilation factor for the input tensor
- * @return values: Vector of values from the input tensor. First index is set to
- * batch. Height and width begin at height_start and width_start respectively.
+ * @return values: Vector of values from the input tensor. First index is
+ * set to batch. Height and width begin at height_start and width_start
+ * respectively.
  */
 inline vector<double>
 get_values_at_index(int batch, int width_start, int height_start,
@@ -628,13 +728,14 @@ get_values_at_index(int batch, int width_start, int height_start,
  * @param input: Tensor with shape (batch_size, height, width, channels)
  * @param kernel: Tensor with shape (number_filters, kernel_height,
  * kernel_width, channels). Only includes weights but not bias.
- * @param bias: Tensor with shape (1, number_filters, 1). Bias to be added to
- * result of convolution.
+ * @param bias: Tensor with shape (1, number_filters, 1). Bias to be added
+ * to result of convolution.
  * @param stride: Stride of the convolution.
  * @param padding: Padding of the convolution.
  * @param dilation: Dilation of the convolution.
  * @return conv_result: Tensor with shape (batch_size, (height -
- * kernel_height)/stride + 1, (width - kernel_width)/stride + 1, number_filters)
+ * kernel_height)/stride + 1, (width - kernel_width)/stride + 1,
+ * number_filters)
  */
 /** TODO: Setup matrix multiplication to account for bias */
 inline shared_ptr<Tensor> convolution(shared_ptr<Tensor> input,
