@@ -655,7 +655,7 @@ void convolution_backward(shared_ptr<Tensor> convolution_result,
       }
       shared_ptr<Tensor> kernel_gradients_channel_single =
           make_shared<Tensor>(gradients_filter_channel,
-                              vector<int>{convolution_kernel->shape[1],
+                              vector<int>{1, convolution_kernel->shape[1],
                                           convolution_kernel->shape[2], 1},
                               convolution_result->logger);
       kernel_gradients_channels[c] = kernel_gradients_channel_single;
@@ -664,7 +664,7 @@ void convolution_backward(shared_ptr<Tensor> convolution_result,
         kernel_gradients_channels[0];
     for (int c = 1; c < kernel_gradients_channels.size(); c++) {
       kernel_gradients_filter_single = concatenate_forward(
-          kernel_gradients_filter_single, kernel_gradients_channels[c], 2);
+          kernel_gradients_filter_single, kernel_gradients_channels[c], 3);
     }
     kernel_gradients_filters[f] = kernel_gradients_filter_single;
   }
