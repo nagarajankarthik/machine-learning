@@ -163,8 +163,8 @@ Similarly,
 $$
 \begin{flalign*}
 \frac{\partial L}{\partial \mathbf{k}(h, c, d, r)} &= \sum_{w = 0}^{N - 1} \sum_{i=0}^{W - F} \sum_{j = 0}^{H - F} \sum_{g=0}^{Q-1} \frac{\partial L}{\partial \mathbf{R}(w, i, j, g)}\frac{\partial \mathbf{R}(w, i, j, g)}{\partial \mathbf{k}(h, c, d, r)} \\
-&= \sum_{w = 0}^{N - 1} \sum_{i=0}^{W - F} \sum_{j=0}^{H - F} \sum_{g=0}^{Q-1} \gamma(i, j) \frac{\partial L}{\partial \mathbf{R}(i, j)} \sum_{p = 0}^{C - 1}\sum_{a=0}^{F-1} \sum_{b=0}^{F-1} \mathbf{I}(i + a, j + b, p) \delta_{a, c} \delta_{b, d} \delta_{p, r} \\
-&= \sum_{i=0}^{W - F} \sum_{j=0}^{H - F} \gamma(i, j) \frac{\partial L}{\partial \mathbf{R}(i, j)}  \mathbf{I}(c + i, j + d, r) \\
+&= \sum_{w = 0}^{N - 1} \sum_{i=0}^{W - F} \sum_{j=0}^{H - F} \sum_{g=0}^{Q-1} \gamma(i, j) \frac{\partial L}{\partial \mathbf{R}(w, i, j, g)} \sum_{p = 0}^{C - 1}\sum_{a=0}^{F-1} \sum_{b=0}^{F-1} \mathbf{I}(i + a, j + b, p) \delta_{a, c} \delta_{b, d} \delta_{p, r} \delta_{gh} \\
+&= \sum_{w = 0}^{N - 1} \sum_{i=0}^{W - F} \sum_{j=0}^{H - F} \gamma(i, j) \frac{\partial L}{\partial \mathbf{R}(w, i, j, g)}  \mathbf{I}(c + i, j + d, r) \\
 \end{flalign*}
 $$
 
