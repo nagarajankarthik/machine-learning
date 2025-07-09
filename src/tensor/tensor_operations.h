@@ -10,8 +10,7 @@ inline vector<int> broadcast_shape(vector<int> t1_shape, vector<int> t2_shape,
   int m = t1_shape.size();
   int n = t2_shape.size();
 
-  // Process batch (non-matrix) dimensions
-  for (int i = 2; i < max(m, n); i++) {
+  for (int i = 0; i < max(m, n); i++) {
     int first_index = m - 1 - i;
     int second_index = n - 1 - i;
     if (first_index < 0)
@@ -513,6 +512,11 @@ void flip_kernel(shared_ptr<Tensor> kernel) {
   }
 }
 
+std::shared_ptr<Tensor>
+convolution(std::shared_ptr<Tensor> input, std::shared_ptr<Tensor> kernel,
+            std::shared_ptr<Tensor> bias, int stride = 1, int padding = 0,
+            int dilation_input = 1, int dilation_kernel = 1);
+
 /**
  * Function to perform backward pass of convolution operation
  * @param convolution_result: Tensor with shape (batch_size,
@@ -836,8 +840,6 @@ inline shared_ptr<Tensor> convolution(shared_ptr<Tensor> input,
     convolution_backward(t3, stride);
   };
   convolution_result->backward_function = conv_back;
-  // Add bias to the convolution result. The former should have shape (1,
-  // number_filters).
   shared_ptr<Tensor> convolution_result_bias =
       add_batch_forward(convolution_result, bias);
   return convolution_result_bias;
