@@ -512,11 +512,11 @@ void flip_kernel(shared_ptr<Tensor> kernel) {
   }
 }
 
-std::shared_ptr<Tensor>
-convolution(std::shared_ptr<Tensor> input, std::shared_ptr<Tensor> kernel,
-            std::shared_ptr<Tensor> bias, int stride = 1, int padding = 0,
-            int dilation_input = 1, int dilation_kernel = 1);
-
+inline shared_ptr<Tensor> convolution(shared_ptr<Tensor> input,
+                                      shared_ptr<Tensor> kernel,
+                                      shared_ptr<Tensor> bias, int stride = 1,
+                                      int padding = 0, int dilation_input = 1,
+                                      int dilation_kernel = 1);
 /**
  * Function to perform backward pass of convolution operation
  * @param convolution_result: Tensor with shape (batch_size,
@@ -525,6 +525,11 @@ convolution(std::shared_ptr<Tensor> input, std::shared_ptr<Tensor> kernel,
  */
 inline void convolution_backward(shared_ptr<Tensor> convolution_result,
                                  int stride = 1) {
+
+  vector<double> bias_values(convolution_result->shape[3], 0.);
+  shared_ptr<Tensor> bias_tensor = make_shared<Tensor>(
+      bias_values, vector<int>{1, convolution_result->shape[3]},
+      convolution_result->logger);
 
   shared_ptr<Tensor> gradient_tensor = make_shared<Tensor>(
       convolution_result->gradients, convolution_result->shape,
@@ -584,7 +589,7 @@ inline void convolution_backward(shared_ptr<Tensor> convolution_result,
       // Perform convolution with the kernel and the gradient tensor
       // shape of convolution_channel_filter is (batch_size, height, width, 1)
       shared_ptr<Tensor> input_gradients_channel_filter =
-          convolution(gradient_subtensor, kernel_tensor, 1,
+          convolution(gradient_subtensor, kernel_tensor, bias_tensor, 1,
                       convolution_kernel->shape[1] - 1, stride, 1);
       // Add the gradients to the channel of the gradient tensor
       for (int i = 0; i < input_gradients_channel_filter->values.size(); i++) {
@@ -650,8 +655,9 @@ inline void convolution_backward(shared_ptr<Tensor> convolution_result,
                                 convolution_result->logger);
 
         // Perform convolution with the kernel and the gradient tensor
-        shared_ptr<Tensor> kernel_filter_gradients = convolution(
-            convolution_input_subtensor, gradient_subtensor, 1, 0, 1, stride);
+        shared_ptr<Tensor> kernel_filter_gradients =
+            convolution(convolution_input_subtensor, gradient_subtensor,
+                        bias_tensor, 1, 0, 1, stride);
         // Add the gradients to the kernel
         for (int i = 0; i < kernel_filter_gradients->values.size(); i++) {
           gradients_filter_channel[i] += kernel_filter_gradients->values[i];
@@ -732,7 +738,7 @@ get_values_at_index(int batch, int width_start, int height_start,
  * @param input: Tensor with shape (batch_size, height, width, channels)
  * @param kernel: Tensor with shape (number_filters, kernel_height,
  * kernel_width, channels). Only includes weights but not bias.
- * @param bias: Tensor with shape (1, number_filters, 1). Bias to be added
+ * @param bias: Tensor with shape (1, number_filters). Bias to be added
  * to result of convolution.
  * @param stride: Stride of the convolution.
  * @param padding: Padding of the convolution.
@@ -741,12 +747,11 @@ get_values_at_index(int batch, int width_start, int height_start,
  * kernel_height)/stride + 1, (width - kernel_width)/stride + 1,
  * number_filters)
  */
-/** TODO: Setup matrix multiplication to account for bias */
 inline shared_ptr<Tensor> convolution(shared_ptr<Tensor> input,
                                       shared_ptr<Tensor> kernel,
-                                      shared_ptr<Tensor> bias, int stride = 1,
-                                      int padding = 0, int dilation_input = 1,
-                                      int dilation_kernel = 1) {
+                                      shared_ptr<Tensor> bias, int stride,
+                                      int padding, int dilation_input,
+                                      int dilation_kernel) {
   shared_ptr<Logger> logger = input->logger;
 
   // Update input to account for padding and dilation
