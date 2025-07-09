@@ -519,8 +519,8 @@ void flip_kernel(shared_ptr<Tensor> kernel) {
  * height_output, width_output, num_filters).
  * @param stride: Stride of the convolution for forward pass.
  */
-void convolution_backward(shared_ptr<Tensor> convolution_result,
-                          int stride = 1) {
+inline void convolution_backward(shared_ptr<Tensor> convolution_result,
+                                 int stride = 1) {
 
   shared_ptr<Tensor> gradient_tensor = make_shared<Tensor>(
       convolution_result->gradients, convolution_result->shape,
