@@ -145,8 +145,8 @@ inline shared_ptr<Tensor> add_batch_forward(const shared_ptr<Tensor> t1,
     exit(1);
   }
 
-  new_shape.push_back(t1->shape[m - 2]);
-  new_shape.push_back(t1->shape[m - 1]);
+  logger->log(INFO, "New shape for addition: " + to_string(new_shape.size()) +
+                        " dimensions.");
 
   int number_of_values = 1;
   for (int i = 0; i < new_shape.size(); i++) {
@@ -179,9 +179,6 @@ inline vector<int> get_shape_after_matmul(shared_ptr<Tensor> t1,
                            " but size of second to last dimension of t2 is " +
                            to_string(t2->shape[n - 2]));
     exit(1);
-  } else {
-    new_shape.push_back(t1->shape[m - 2]);
-    new_shape.push_back(t2->shape[n - 1]);
   }
 
   return new_shape;
