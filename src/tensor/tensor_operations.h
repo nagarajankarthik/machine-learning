@@ -1060,6 +1060,7 @@ get_values_at_index(int batch, int width_start, int height_start,
   vector<double> values{};
   int height_input = input->shape[1];
   int width_input = input->shape[2];
+  shared_ptr<Logger> logger = input->logger;
 
   for (int l = height_start; l < height_start + dilated_kernel_height; l++) {
     for (int k = width_start; k < width_start + dilated_kernel_width; k++) {
@@ -1076,6 +1077,7 @@ get_values_at_index(int batch, int width_start, int height_start,
           int i = (l - padding) / dilation_input;
           int j = (k - padding) / dilation_input;
           vector<int> required_index = {batch, i, j, p};
+          logger->log(DEBUG, to_string(input->get_element(required_index)));
           values.push_back(input->get_element(required_index));
         }
       }
