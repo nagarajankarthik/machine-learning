@@ -536,22 +536,39 @@ TEST_F(TensorOpsTest, GetValuesIndexTest) {
 
   for (int j = 0; j < input_shape[1]; j++) {
     for (int i = 0; i < input_shape[2]; i++) {
-      input_tensor->set_element(vector<int>{0, j, i, 0}, 0.);
-      input_tensor->set_element(vector<int>{0, j, i, 1}, 1.);
-      input_tensor->set_element(vector<int>{1, j, i, 0}, 2.);
-      input_tensor->set_element(vector<int>{1, j, i, 1}, 3.);
+      input_tensor->set_element(vector<int>{0, j, i, 0}, 1.);
+      input_tensor->set_element(vector<int>{0, j, i, 1}, 2.);
+      input_tensor->set_element(vector<int>{1, j, i, 0}, 3.);
+      input_tensor->set_element(vector<int>{1, j, i, 1}, 4.);
     }
   }
 
-  // Get values at index (batch, height, width, channels)
+  // Get values at index for dilation_input = 1, padding = 0
+  logger->log(INFO, "Get values at index for dilation_input = 1, padding = 0");
   vector<double> values =
       get_values_at_index(0, 1, 1, input_tensor, 2, 2, 0, 1);
   ASSERT_EQ(values.size(), 8);
   for (int i = 0; i < values.size(); i++) {
     if (i % 2) {
-      ASSERT_FLOAT_EQ(values[i], 1.);
+      ASSERT_FLOAT_EQ(values[i], 2.);
     } else {
-      ASSERT_FLOAT_EQ(values[i], 0.);
+      ASSERT_FLOAT_EQ(values[i], 1.);
     }
   }
+
+  // Get values at index for dilation_input = 2, padding = 1
+  logger->log(INFO, "Get values at index for dilation_input = 2, padding = 1");
+  values = get_values_at_index(0, 1, 1, input_tensor, 2, 2, 0, 2);
+  ASSERT_EQ(values.size(), 8);
+  ASSERT_FLOAT_EQ(values[0], 0.);
+  ASSERT_FLOAT_EQ(values[1], 0.);
+  ASSERT_FLOAT_EQ(values[2], 1.);
+  ASSERT_FLOAT_EQ(values[3], 2.);
+  // for (int i = 0; i < values.size(); i++) {
+  //   if (i % 2) {
+  //     ASSERT_FLOAT_EQ(values[i], 1.);
+  //   } else {
+  //     ASSERT_FLOAT_EQ(values[i], 0.);
+  //   }
+  // }
 }
