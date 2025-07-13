@@ -486,6 +486,361 @@ inline shared_ptr<Tensor> concatenate_forward(shared_ptr<Tensor> t1,
   return t3;
 }
 
+// Activation functions
+inline void relu_backward(shared_ptr<Tensor> t3) {
+
+  shared_ptr<Tensor> t1 = t3->input_first;
+  if (!t1)
+    return;
+  for (int i = 0; i < t1->values.size(); i++) {
+    t1->gradients[i] = t3->values[i] > 0. ? t3->gradients[i] : 0.;
+  }
+}
+
+inline shared_ptr<Tensor> relu_forward(shared_ptr<Tensor> t1) {
+  shared_ptr<Logger> logger = t1->logger;
+  shared_ptr<Tensor> t3 =
+      make_shared<Tensor>(vector<double>(t1->values.size(), 0.), t1->shape,
+                          logger, t1, nullptr, relu_backward);
+  for (int i = 0; i < t1->values.size(); i++) {
+    t3->values[i] = max(0., t1->values[i]);
+  }
+  return t3;
+}
+
+inline void sigmoid_backward(shared_ptr<Tensor> t3) {
+
+  shared_ptr<Tensor> t1 = t3->input_first;
+  if (!t1)
+    return;
+  for (int i = 0; i < t1->values.size(); i++) {
+    double function_result = t3->values[i];
+    t1->gradients[i] =
+        function_result * (1. - function_result) * t3->gradients[i];
+  }
+}
+
+inline shared_ptr<Tensor> sigmoid_forward(shared_ptr<Tensor> t1) {
+  shared_ptr<Logger> logger = t1->logger;
+  shared_ptr<Tensor> t3 =
+      make_shared<Tensor>(vector<double>(t1->values.size(), 0.), t1->shape,
+                          logger, t1, nullptr, sigmoid_backward);
+  for (int i = 0; i < t1->values.size(); i++) {
+    t3->values[i] = 1. / (1. + exp(-t1->values[i]));
+  }
+  return t3;
+}
+
+inline void tanh_backward(shared_ptr<Tensor> t3) {
+
+  shared_ptr<Tensor> t1 = t3->input_first;
+  if (!t1)
+    return;
+  for (int i = 0; i < t1->values.size(); i++) {
+    double function_result = t3->values[i];
+    t1->gradients[i] =
+        (1. - function_result * function_result) * t3->gradients[i];
+  }
+}
+
+inline shared_ptr<Tensor> tanh_forward(shared_ptr<Tensor> t1) {
+  shared_ptr<Logger> logger = t1->logger;
+  shared_ptr<Tensor> t3 =
+      make_shared<Tensor>(vector<double>(t1->values.size(), 0.), t1->shape,
+                          logger, t1, nullptr, tanh_backward);
+  for (int i = 0; i < t1->values.size(); i++) {
+    t3->values[i] = tanh(t1->values[i]);
+  }
+  return t3;
+}
+
+inline vector<vector<double>>
+elementwise_multiplication(vector<vector<double>> m1, vector<vector<double>> m2,
+                           shared_ptr<Logger> logger) {
+  if (m1.size() != m2.size() || m1[0].size() != m2[0].size()) {
+    logger->log(ERROR, "Matrix dimensions do not match in "
+                       "elementwise_multiplication.");
+    exit(1);
+  }
+  vector<vector<double>> result(m1.size(), vector<double>(m1[0].size(), 0.));
+  for (int i = 0; i < m1.size(); i++) {
+    for (int j = 0; j < m1[0].size(); j++) {
+      result[i][j] = m1[i][j] * m2[i][j];
+    }
+  }
+  return result;
+}
+
+/**
+ * Returns the sum of the values in each column of the input matrix.
+ */
+inline vector<double> matrix_col_sum(vector<vector<double>> matrix) {
+  vector<double> result(matrix[0].size(), 0.);
+  for (int j = 0; j < matrix[0].size(); j++) {
+    double sum = 0.;
+    for (int i = 0; i < matrix.size(); i++) {
+      sum += matrix[i][j];
+    }
+    result[j] = sum;
+  }
+  return result;
+}
+
+inline void recurse_softmax_backward(const shared_ptr<Tensor> t3,
+                                     shared_ptr<Tensor> t1,
+                                     vector<int> &new_position, int axis = 0) {
+
+  if (axis == t3->shape.size() - 2) {
+    vector<vector<double>> g3 = t3->get_matrix(new_position, "gradients");
+    vector<vector<double>> m3 = t3->get_matrix(new_position);
+    vector<vector<double>> gradient_values_product =
+        elementwise_multiplication(g3, m3, t1->logger);
+    vector<double> gradient_values_product_sum =
+        matrix_col_sum(gradient_values_product);
+
+    vector<vector<double>> g1(g3.size(), vector<double>(g3[0].size(), 0.));
+    for (int j = 0; j < g1[0].size(); j++) {
+      for (int i = 0; i < g1.size(); i++) {
+        g1[i][j] = m3[i][j] * (g3[i][j] - gradient_values_product_sum[j]);
+      }
+    }
+    t1->set_matrix(new_position, g1, "gradients");
+    return;
+  }
+
+  new_position.push_back(0);
+  int position_index = new_position.size() - 1;
+
+  for (int i = 0; i < t3->shape[axis]; i++) {
+    new_position[position_index] = i;
+    recurse_softmax_backward(t3, t1, new_position, axis + 1);
+  }
+  new_position.pop_back();
+}
+
+inline void softmax_backward(shared_ptr<Tensor> t3) {
+
+  shared_ptr<Tensor> t1 = t3->input_first;
+  if (!t1)
+    return;
+  vector<int> new_position{};
+  recurse_softmax_backward(t3, t1, new_position);
+}
+
+inline vector<vector<double>> evaluate_softmax(const vector<vector<double>> &m1,
+                                               shared_ptr<Logger> logger) {
+  vector<vector<double>> softmax_result(m1.size(),
+                                        vector<double>(m1[0].size(), 0.));
+  for (int j = 0; j < m1[0].size(); j++) {
+    double sum = 0.;
+    for (int i = 0; i < m1.size(); i++) {
+      softmax_result[i][j] = exp(m1[i][j]);
+      sum += softmax_result[i][j];
+    }
+    for (int i = 0; i < m1.size(); i++) {
+      softmax_result[i][j] /= sum;
+    }
+  }
+  return softmax_result;
+}
+
+inline void recurse_softmax_forward(shared_ptr<Tensor> t3,
+                                    const shared_ptr<Tensor> t1,
+                                    vector<int> &new_position, int axis = 0) {
+
+  if (axis == t3->shape.size() - 2) {
+    vector<vector<double>> m1 = t1->get_matrix(new_position);
+    vector<vector<double>> softmax_result = evaluate_softmax(m1, t1->logger);
+    t3->set_matrix(new_position, softmax_result);
+    return;
+  }
+
+  new_position.push_back(0);
+  int position_index = new_position.size() - 1;
+
+  for (int i = 0; i < t3->shape[axis]; i++) {
+    new_position[position_index] = i;
+    recurse_softmax_forward(t3, t1, new_position, axis + 1);
+  }
+  new_position.pop_back();
+}
+
+inline shared_ptr<Tensor> softmax_forward(shared_ptr<Tensor> t1) {
+  shared_ptr<Logger> logger = t1->logger;
+  shared_ptr<Tensor> t3 =
+      make_shared<Tensor>(vector<double>(t1->values.size(), 0.), t1->shape,
+                          logger, t1, nullptr, softmax_backward);
+  vector<int> new_position{};
+  recurse_softmax_forward(t3, t1, new_position);
+  return t3;
+}
+
+// Loss functions
+
+inline void
+recurse_cross_entropy_backward(shared_ptr<Tensor> predicted,
+                               const shared_ptr<Tensor> ground_truth,
+                               vector<int> &new_position, int axis = 0) {
+
+  if (axis == predicted->shape.size() - 2) {
+    vector<vector<double>> predicted_values =
+        predicted->get_matrix(new_position);
+    vector<vector<double>> ground_truth_values =
+        ground_truth->get_matrix(new_position);
+
+    vector<vector<double>> loss_gradient(
+        predicted_values.size(),
+        vector<double>(predicted_values[0].size(), 0.));
+
+    for (int j = 0; j < predicted_values[0].size(); j++) {
+      for (int i = 0; i < predicted_values.size(); i++) {
+        loss_gradient[i][j] =
+            -1.0 * ground_truth_values[i][j] / predicted_values[i][j];
+      }
+    }
+    predicted->set_matrix(new_position, loss_gradient, "gradients");
+    return;
+  }
+
+  new_position.push_back(0);
+  int position_index = new_position.size() - 1;
+
+  for (int i = 0; i < predicted->shape[axis]; i++) {
+    new_position[position_index] = i;
+    recurse_cross_entropy_backward(predicted, ground_truth, new_position,
+                                   axis + 1);
+  }
+  new_position.pop_back();
+}
+
+inline void cross_entropy_backward(shared_ptr<Tensor> loss) {
+
+  shared_ptr<Tensor> predicted = loss->input_first;
+  if (!predicted)
+    return;
+  shared_ptr<Tensor> ground_truth = loss->input_second;
+  vector<int> new_position{};
+  recurse_cross_entropy_backward(predicted, ground_truth, new_position);
+}
+
+inline vector<double>
+evaluate_cross_entropy(vector<vector<double>> predicted,
+                       vector<vector<double>> ground_truth,
+                       shared_ptr<Logger> logger) {
+  if (predicted.size() != ground_truth.size() ||
+      predicted[0].size() != ground_truth[0].size()) {
+    logger->log(ERROR, "Matrix dimensions do not match in "
+                       "evaluate_cross_entropy.");
+    exit(1);
+  }
+  vector<double> loss(predicted[0].size(), 0.);
+  for (int j = 0; j < predicted[0].size(); j++) {
+    double cross_entropy = 0.;
+    for (int i = 0; i < predicted.size(); i++) {
+      cross_entropy += ground_truth[i][j] * log(predicted[i][j]);
+    }
+    loss[j] = -cross_entropy;
+  }
+  return loss;
+}
+
+inline void recurse_cross_entropy_forward(shared_ptr<Tensor> loss,
+                                          const shared_ptr<Tensor> predicted,
+                                          const shared_ptr<Tensor> ground_truth,
+                                          vector<int> &new_position,
+                                          int axis = 0) {
+
+  if (axis == loss->shape.size() - 2) {
+    vector<vector<double>> m1 = predicted->get_matrix(new_position);
+    vector<vector<double>> m2 = ground_truth->get_matrix(new_position);
+    vector<double> cross_entropy_loss =
+        evaluate_cross_entropy(m1, m2, predicted->logger);
+    vector<vector<double>> result{cross_entropy_loss};
+    loss->set_matrix(new_position, result, "values");
+    return;
+  }
+
+  new_position.push_back(0);
+  int position_index = new_position.size() - 1;
+
+  for (int i = 0; i < loss->shape[axis]; i++) {
+    new_position[position_index] = i;
+    recurse_cross_entropy_forward(loss, predicted, ground_truth, new_position,
+                                  axis + 1);
+  }
+  new_position.pop_back();
+}
+
+inline shared_ptr<Tensor>
+categorical_cross_entropy_forward(shared_ptr<Tensor> predicted,
+                                  shared_ptr<Tensor> ground_truth) {
+  shared_ptr<Logger> logger = predicted->logger;
+  if (predicted->shape != ground_truth->shape) {
+    logger->log(ERROR,
+                "The shapes of the predicted and ground truth arrays are "
+                "mismatched in categorical cross entropy.");
+    exit(1);
+  }
+
+  vector<int> loss_shape = predicted->shape;
+  int last_index = loss_shape.size() - 1;
+  loss_shape[last_index - 1] = 1;
+
+  int number_elements = 1;
+  for (int i = 0; i < loss_shape.size(); i++) {
+    number_elements *= loss_shape[i];
+  }
+
+  vector<double> loss_values(number_elements, 0.);
+  shared_ptr<Tensor> loss =
+      make_shared<Tensor>(loss_values, loss_shape, logger, predicted,
+                          ground_truth, cross_entropy_backward);
+  vector<int> new_position{};
+  recurse_cross_entropy_forward(loss, predicted, ground_truth, new_position);
+  return loss;
+}
+
+inline void mean_squared_error_backward(shared_ptr<Tensor> loss) {
+  shared_ptr<Tensor> predicted = loss->input_first;
+  shared_ptr<Tensor> ground_truth = loss->input_second;
+
+  for (int i = 0; i < predicted->values.size(); i++) {
+    predicted->gradients[i] +=
+        2.0 * (predicted->values[i] - ground_truth->values[i]);
+  }
+}
+
+inline shared_ptr<Tensor>
+mean_squared_error_forward(shared_ptr<Tensor> predicted,
+                           shared_ptr<Tensor> ground_truth) {
+  shared_ptr<Logger> logger = predicted->logger;
+  if (predicted->shape != ground_truth->shape) {
+    logger->log(ERROR,
+                "The shapes of the predicted and ground truth arrays are "
+                "mismatched in mean_squared_error_forward.");
+    exit(1);
+  }
+
+  vector<int> loss_shape = predicted->shape;
+
+  int number_elements = 1;
+  for (int i = 0; i < loss_shape.size(); i++) {
+    number_elements *= loss_shape[i];
+  }
+
+  vector<double> loss_values(number_elements, 0.);
+
+  for (int i = 0; i < number_elements; i++)
+    loss_values[i] = (predicted->values[i] - ground_truth->values[i]) *
+                     (predicted->values[i] - ground_truth->values[i]);
+
+  shared_ptr<Tensor> loss =
+      make_shared<Tensor>(loss_values, loss_shape, logger, predicted,
+                          ground_truth, mean_squared_error_backward);
+  return loss;
+}
+
+// Convolution operations
 /**
  * Function to flip kernel in-place
  * @param kernel: Tensor with shape (num_filters, kernel_height,
@@ -845,360 +1200,6 @@ inline shared_ptr<Tensor> convolution(shared_ptr<Tensor> input,
   shared_ptr<Tensor> convolution_result_bias =
       add_batch_forward(convolution_result, bias);
   return convolution_result_bias;
-}
-
-// Activation functions
-inline void relu_backward(shared_ptr<Tensor> t3) {
-
-  shared_ptr<Tensor> t1 = t3->input_first;
-  if (!t1)
-    return;
-  for (int i = 0; i < t1->values.size(); i++) {
-    t1->gradients[i] = t3->values[i] > 0. ? t3->gradients[i] : 0.;
-  }
-}
-
-inline shared_ptr<Tensor> relu_forward(shared_ptr<Tensor> t1) {
-  shared_ptr<Logger> logger = t1->logger;
-  shared_ptr<Tensor> t3 =
-      make_shared<Tensor>(vector<double>(t1->values.size(), 0.), t1->shape,
-                          logger, t1, nullptr, relu_backward);
-  for (int i = 0; i < t1->values.size(); i++) {
-    t3->values[i] = max(0., t1->values[i]);
-  }
-  return t3;
-}
-
-inline void sigmoid_backward(shared_ptr<Tensor> t3) {
-
-  shared_ptr<Tensor> t1 = t3->input_first;
-  if (!t1)
-    return;
-  for (int i = 0; i < t1->values.size(); i++) {
-    double function_result = t3->values[i];
-    t1->gradients[i] =
-        function_result * (1. - function_result) * t3->gradients[i];
-  }
-}
-
-inline shared_ptr<Tensor> sigmoid_forward(shared_ptr<Tensor> t1) {
-  shared_ptr<Logger> logger = t1->logger;
-  shared_ptr<Tensor> t3 =
-      make_shared<Tensor>(vector<double>(t1->values.size(), 0.), t1->shape,
-                          logger, t1, nullptr, sigmoid_backward);
-  for (int i = 0; i < t1->values.size(); i++) {
-    t3->values[i] = 1. / (1. + exp(-t1->values[i]));
-  }
-  return t3;
-}
-
-inline void tanh_backward(shared_ptr<Tensor> t3) {
-
-  shared_ptr<Tensor> t1 = t3->input_first;
-  if (!t1)
-    return;
-  for (int i = 0; i < t1->values.size(); i++) {
-    double function_result = t3->values[i];
-    t1->gradients[i] =
-        (1. - function_result * function_result) * t3->gradients[i];
-  }
-}
-
-inline shared_ptr<Tensor> tanh_forward(shared_ptr<Tensor> t1) {
-  shared_ptr<Logger> logger = t1->logger;
-  shared_ptr<Tensor> t3 =
-      make_shared<Tensor>(vector<double>(t1->values.size(), 0.), t1->shape,
-                          logger, t1, nullptr, tanh_backward);
-  for (int i = 0; i < t1->values.size(); i++) {
-    t3->values[i] = tanh(t1->values[i]);
-  }
-  return t3;
-}
-
-inline vector<vector<double>>
-elementwise_multiplication(vector<vector<double>> m1, vector<vector<double>> m2,
-                           shared_ptr<Logger> logger) {
-  if (m1.size() != m2.size() || m1[0].size() != m2[0].size()) {
-    logger->log(ERROR, "Matrix dimensions do not match in "
-                       "elementwise_multiplication.");
-    exit(1);
-  }
-  vector<vector<double>> result(m1.size(), vector<double>(m1[0].size(), 0.));
-  for (int i = 0; i < m1.size(); i++) {
-    for (int j = 0; j < m1[0].size(); j++) {
-      result[i][j] = m1[i][j] * m2[i][j];
-    }
-  }
-  return result;
-}
-
-/**
- * Returns the sum of the values in each column of the input matrix.
- */
-inline vector<double> matrix_col_sum(vector<vector<double>> matrix) {
-  vector<double> result(matrix[0].size(), 0.);
-  for (int j = 0; j < matrix[0].size(); j++) {
-    double sum = 0.;
-    for (int i = 0; i < matrix.size(); i++) {
-      sum += matrix[i][j];
-    }
-    result[j] = sum;
-  }
-  return result;
-}
-
-inline void recurse_softmax_backward(const shared_ptr<Tensor> t3,
-                                     shared_ptr<Tensor> t1,
-                                     vector<int> &new_position, int axis = 0) {
-
-  if (axis == t3->shape.size() - 2) {
-    vector<vector<double>> g3 = t3->get_matrix(new_position, "gradients");
-    vector<vector<double>> m3 = t3->get_matrix(new_position);
-    vector<vector<double>> gradient_values_product =
-        elementwise_multiplication(g3, m3, t1->logger);
-    vector<double> gradient_values_product_sum =
-        matrix_col_sum(gradient_values_product);
-
-    vector<vector<double>> g1(g3.size(), vector<double>(g3[0].size(), 0.));
-    for (int j = 0; j < g1[0].size(); j++) {
-      for (int i = 0; i < g1.size(); i++) {
-        g1[i][j] = m3[i][j] * (g3[i][j] - gradient_values_product_sum[j]);
-      }
-    }
-    t1->set_matrix(new_position, g1, "gradients");
-    return;
-  }
-
-  new_position.push_back(0);
-  int position_index = new_position.size() - 1;
-
-  for (int i = 0; i < t3->shape[axis]; i++) {
-    new_position[position_index] = i;
-    recurse_softmax_backward(t3, t1, new_position, axis + 1);
-  }
-  new_position.pop_back();
-}
-
-inline void softmax_backward(shared_ptr<Tensor> t3) {
-
-  shared_ptr<Tensor> t1 = t3->input_first;
-  if (!t1)
-    return;
-  vector<int> new_position{};
-  recurse_softmax_backward(t3, t1, new_position);
-}
-
-inline vector<vector<double>> evaluate_softmax(const vector<vector<double>> &m1,
-                                               shared_ptr<Logger> logger) {
-  vector<vector<double>> softmax_result(m1.size(),
-                                        vector<double>(m1[0].size(), 0.));
-  for (int j = 0; j < m1[0].size(); j++) {
-    double sum = 0.;
-    for (int i = 0; i < m1.size(); i++) {
-      softmax_result[i][j] = exp(m1[i][j]);
-      sum += softmax_result[i][j];
-    }
-    for (int i = 0; i < m1.size(); i++) {
-      softmax_result[i][j] /= sum;
-    }
-  }
-  return softmax_result;
-}
-
-inline void recurse_softmax_forward(shared_ptr<Tensor> t3,
-                                    const shared_ptr<Tensor> t1,
-                                    vector<int> &new_position, int axis = 0) {
-
-  if (axis == t3->shape.size() - 2) {
-    vector<vector<double>> m1 = t1->get_matrix(new_position);
-    vector<vector<double>> softmax_result = evaluate_softmax(m1, t1->logger);
-    t3->set_matrix(new_position, softmax_result);
-    return;
-  }
-
-  new_position.push_back(0);
-  int position_index = new_position.size() - 1;
-
-  for (int i = 0; i < t3->shape[axis]; i++) {
-    new_position[position_index] = i;
-    recurse_softmax_forward(t3, t1, new_position, axis + 1);
-  }
-  new_position.pop_back();
-}
-
-inline shared_ptr<Tensor> softmax_forward(shared_ptr<Tensor> t1) {
-  shared_ptr<Logger> logger = t1->logger;
-  shared_ptr<Tensor> t3 =
-      make_shared<Tensor>(vector<double>(t1->values.size(), 0.), t1->shape,
-                          logger, t1, nullptr, softmax_backward);
-  vector<int> new_position{};
-  recurse_softmax_forward(t3, t1, new_position);
-  return t3;
-}
-
-// Loss functions
-
-inline void
-recurse_cross_entropy_backward(shared_ptr<Tensor> predicted,
-                               const shared_ptr<Tensor> ground_truth,
-                               vector<int> &new_position, int axis = 0) {
-
-  if (axis == predicted->shape.size() - 2) {
-    vector<vector<double>> predicted_values =
-        predicted->get_matrix(new_position);
-    vector<vector<double>> ground_truth_values =
-        ground_truth->get_matrix(new_position);
-
-    vector<vector<double>> loss_gradient(
-        predicted_values.size(),
-        vector<double>(predicted_values[0].size(), 0.));
-
-    for (int j = 0; j < predicted_values[0].size(); j++) {
-      for (int i = 0; i < predicted_values.size(); i++) {
-        loss_gradient[i][j] =
-            -1.0 * ground_truth_values[i][j] / predicted_values[i][j];
-      }
-    }
-    predicted->set_matrix(new_position, loss_gradient, "gradients");
-    return;
-  }
-
-  new_position.push_back(0);
-  int position_index = new_position.size() - 1;
-
-  for (int i = 0; i < predicted->shape[axis]; i++) {
-    new_position[position_index] = i;
-    recurse_cross_entropy_backward(predicted, ground_truth, new_position,
-                                   axis + 1);
-  }
-  new_position.pop_back();
-}
-
-inline void cross_entropy_backward(shared_ptr<Tensor> loss) {
-
-  shared_ptr<Tensor> predicted = loss->input_first;
-  if (!predicted)
-    return;
-  shared_ptr<Tensor> ground_truth = loss->input_second;
-  vector<int> new_position{};
-  recurse_cross_entropy_backward(predicted, ground_truth, new_position);
-}
-
-inline vector<double>
-evaluate_cross_entropy(vector<vector<double>> predicted,
-                       vector<vector<double>> ground_truth,
-                       shared_ptr<Logger> logger) {
-  if (predicted.size() != ground_truth.size() ||
-      predicted[0].size() != ground_truth[0].size()) {
-    logger->log(ERROR, "Matrix dimensions do not match in "
-                       "evaluate_cross_entropy.");
-    exit(1);
-  }
-  vector<double> loss(predicted[0].size(), 0.);
-  for (int j = 0; j < predicted[0].size(); j++) {
-    double cross_entropy = 0.;
-    for (int i = 0; i < predicted.size(); i++) {
-      cross_entropy += ground_truth[i][j] * log(predicted[i][j]);
-    }
-    loss[j] = -cross_entropy;
-  }
-  return loss;
-}
-
-inline void recurse_cross_entropy_forward(shared_ptr<Tensor> loss,
-                                          const shared_ptr<Tensor> predicted,
-                                          const shared_ptr<Tensor> ground_truth,
-                                          vector<int> &new_position,
-                                          int axis = 0) {
-
-  if (axis == loss->shape.size() - 2) {
-    vector<vector<double>> m1 = predicted->get_matrix(new_position);
-    vector<vector<double>> m2 = ground_truth->get_matrix(new_position);
-    vector<double> cross_entropy_loss =
-        evaluate_cross_entropy(m1, m2, predicted->logger);
-    vector<vector<double>> result{cross_entropy_loss};
-    loss->set_matrix(new_position, result, "values");
-    return;
-  }
-
-  new_position.push_back(0);
-  int position_index = new_position.size() - 1;
-
-  for (int i = 0; i < loss->shape[axis]; i++) {
-    new_position[position_index] = i;
-    recurse_cross_entropy_forward(loss, predicted, ground_truth, new_position,
-                                  axis + 1);
-  }
-  new_position.pop_back();
-}
-
-inline shared_ptr<Tensor>
-categorical_cross_entropy_forward(shared_ptr<Tensor> predicted,
-                                  shared_ptr<Tensor> ground_truth) {
-  shared_ptr<Logger> logger = predicted->logger;
-  if (predicted->shape != ground_truth->shape) {
-    logger->log(ERROR,
-                "The shapes of the predicted and ground truth arrays are "
-                "mismatched in categorical cross entropy.");
-    exit(1);
-  }
-
-  vector<int> loss_shape = predicted->shape;
-  int last_index = loss_shape.size() - 1;
-  loss_shape[last_index - 1] = 1;
-
-  int number_elements = 1;
-  for (int i = 0; i < loss_shape.size(); i++) {
-    number_elements *= loss_shape[i];
-  }
-
-  vector<double> loss_values(number_elements, 0.);
-  shared_ptr<Tensor> loss =
-      make_shared<Tensor>(loss_values, loss_shape, logger, predicted,
-                          ground_truth, cross_entropy_backward);
-  vector<int> new_position{};
-  recurse_cross_entropy_forward(loss, predicted, ground_truth, new_position);
-  return loss;
-}
-
-inline void mean_squared_error_backward(shared_ptr<Tensor> loss) {
-  shared_ptr<Tensor> predicted = loss->input_first;
-  shared_ptr<Tensor> ground_truth = loss->input_second;
-
-  for (int i = 0; i < predicted->values.size(); i++) {
-    predicted->gradients[i] +=
-        2.0 * (predicted->values[i] - ground_truth->values[i]);
-  }
-}
-
-inline shared_ptr<Tensor>
-mean_squared_error_forward(shared_ptr<Tensor> predicted,
-                           shared_ptr<Tensor> ground_truth) {
-  shared_ptr<Logger> logger = predicted->logger;
-  if (predicted->shape != ground_truth->shape) {
-    logger->log(ERROR,
-                "The shapes of the predicted and ground truth arrays are "
-                "mismatched in mean_squared_error_forward.");
-    exit(1);
-  }
-
-  vector<int> loss_shape = predicted->shape;
-
-  int number_elements = 1;
-  for (int i = 0; i < loss_shape.size(); i++) {
-    number_elements *= loss_shape[i];
-  }
-
-  vector<double> loss_values(number_elements, 0.);
-
-  for (int i = 0; i < number_elements; i++)
-    loss_values[i] = (predicted->values[i] - ground_truth->values[i]) *
-                     (predicted->values[i] - ground_truth->values[i]);
-
-  shared_ptr<Tensor> loss =
-      make_shared<Tensor>(loss_values, loss_shape, logger, predicted,
-                          ground_truth, mean_squared_error_backward);
-  return loss;
 }
 
 } // namespace ml
