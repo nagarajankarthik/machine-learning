@@ -196,7 +196,7 @@ void Tensor::update_strides() {
     product *= *it;
     strides.push_back(product);
   }
-  strides.assign(strides.rbegin(), strides.rend());
+  reverse(strides.begin(), strides.end());
 }
 
 void Tensor::reshape(vector<int> new_shape) {
