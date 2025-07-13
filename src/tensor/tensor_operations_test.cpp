@@ -491,7 +491,6 @@ TEST_F(TensorOpsTest, MeanSquareErrorBackwardTest) {
 }
 
 TEST_F(TensorOpsTest, FlipKernelTest) {
-
   vector<int> kernel_shape{1, 3, 3, 1};
   int num_elements = 1;
   for (int i = 0; i < kernel_shape.size(); i++) {
@@ -511,7 +510,6 @@ TEST_F(TensorOpsTest, FlipKernelTest) {
     for (int c = 0; c < kernel_shape[3]; c++) {
       for (int j = 0; j < kernel_shape[1]; j++) {
         for (int i = 0; i < kernel_shape[2]; i++) {
-          // ASSERT_FLOAT_EQ(kernel->get_element(vector<int>{f, j, i, c}), 0.);
           if ((kernel_shape[2] - 1) - i < i) {
             ASSERT_FLOAT_EQ(kernel->get_element(vector<int>{f, j, i, c}),
                             kernel_copy->get_element(
@@ -520,6 +518,40 @@ TEST_F(TensorOpsTest, FlipKernelTest) {
           }
         }
       }
+    }
+  }
+}
+
+TEST_F(TensorOpsTest, GetValuesIndexTest) {
+
+  // Create input tensor with shape (batch_size, height, width, channels)
+  vector<int> input_shape{2, 3, 3, 2};
+  int num_elements = 1;
+  for (int i = 0; i < input_shape.size(); i++) {
+    num_elements *= input_shape[i];
+  }
+  vector<double> input_values(num_elements, 1.);
+  shared_ptr<Tensor> input_tensor =
+      make_shared<Tensor>(input_values, input_shape, logger);
+
+  for (int j = 0; j < input_shape[1]; j++) {
+    for (int i = 0; i < input_shape[2]; i++) {
+      input_tensor->set_element(vector<int>{0, j, i, 0}, 0.);
+      input_tensor->set_element(vector<int>{0, j, i, 1}, 1.);
+      input_tensor->set_element(vector<int>{1, j, i, 0}, 2.);
+      input_tensor->set_element(vector<int>{1, j, i, 1}, 3.);
+    }
+  }
+
+  // Get values at index (batch, height, width, channels)
+  vector<double> values =
+      get_values_at_index(0, 1, 1, input_tensor, 2, 2, 0, 1);
+  ASSERT_EQ(values.size(), 8);
+  for (int i = 0; i < values.size(); i++) {
+    if (i % 2) {
+      ASSERT_FLOAT_EQ(values[i], 1.);
+    } else {
+      ASSERT_FLOAT_EQ(values[i], 0.);
     }
   }
 }
