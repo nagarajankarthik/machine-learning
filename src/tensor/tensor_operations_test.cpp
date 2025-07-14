@@ -569,13 +569,71 @@ TEST_F(TensorOpsTest, GetValuesIndexTest) {
   // Get values at index for dilation_input = 2, padding = 2
   logger->log(INFO, "Get values at index for dilation_input = 2, padding = 2");
   values = get_values_at_index(0, 3, 3, input_tensor, 2, 2, 2, 2);
-  // Get values at index for dilation_input = 2, padding = 1
-  logger->log(INFO, "Get values at index for dilation_input = 2, padding = 0");
-  values = get_values_at_index(0, 1, 1, input_tensor, 2, 2, 0, 2);
   ASSERT_EQ(values.size(), 8);
   for (int i = 0; i < 6; i++) {
     ASSERT_FLOAT_EQ(values[i], 0.);
   }
   ASSERT_FLOAT_EQ(values[6], 1.);
   ASSERT_FLOAT_EQ(values[7], 2.);
+}
+
+TEST_F(TensorOpsTest, ConvolutionTest) {
+
+  // Create input tensor with shape (batch_size, height, width, channels)
+  vector<int> input_shape{2, 3, 3, 2};
+  int num_elements = 1;
+  for (int i = 0; i < input_shape.size(); i++) {
+    num_elements *= input_shape[i];
+  }
+  vector<double> input_values(num_elements, 1.);
+  shared_ptr<Tensor> input_tensor =
+      make_shared<Tensor>(input_values, input_shape, logger);
+
+  for (int j = 0; j < input_shape[1]; j++) {
+    for (int i = 0; i < input_shape[2]; i++) {
+      input_tensor->set_element(vector<int>{0, j, i, 0}, 1.);
+      input_tensor->set_element(vector<int>{0, j, i, 1}, 2.);
+      input_tensor->set_element(vector<int>{1, j, i, 0}, 3.);
+      input_tensor->set_element(vector<int>{1, j, i, 1}, 4.);
+    }
+  }
+
+  // Create kernel tensor with shape (number_filters, kernel_height,
+  // kernel_width, channels)
+  vector<int> kernel_shape{2, 2, 2, 2};
+  num_elements = 1;
+  for (int i = 0; i < kernel_shape.size(); i++) {
+    num_elements *= kernel_shape[i];
+  }
+  vector<double> kernel_values(num_elements, 1.);
+  for (int i = 0; i < num_elements; i++) {
+    if (i % 2) {
+      kernel_values[i] = 2.;
+    } else {
+      kernel_values[i] = 1.;
+    }
+  }
+  for (int i = 8; i < kernel_values.size(); i++) {
+    kernel_values[i] += 2.;
+  }
+
+  shared_ptr<Tensor> kernel =
+      make_shared<Tensor>(kernel_values, kernel_shape, logger);
+
+  // Initialize bias tensor with shape (1, number_filters).
+  vector<double> bias_values(kernel_shape[0], 1.);
+  shared_ptr<Tensor> bias =
+      make_shared<Tensor>(bias_values, vector<int>{1, kernel_shape[0]}, logger);
+
+  ASSERT_FLOAT_EQ(bias_values[0], 1.);
+  shared_ptr<Tensor> convolution_result =
+      convolution(input_tensor, kernel, bias, 1, 0, 1, 1);
+  ASSERT_FLOAT_EQ(bias_values[0], 2.);
+
+  vector<int> expected_shape{2, 2, 2, 2};
+  vector<int> result_shape = convolution_result->shape;
+  ASSERT_EQ(result_shape.size(), expected_shape.size());
+  for (int i = 0; i < expected_shape.size(); i++) {
+    ASSERT_FLOAT_EQ(result_shape[i], expected_shape[i]);
+  }
 }
