@@ -1077,7 +1077,6 @@ get_values_at_index(int batch, int width_start, int height_start,
           int i = (l - padding) / dilation_input;
           int j = (k - padding) / dilation_input;
           vector<int> required_index = {batch, i, j, p};
-          logger->log(DEBUG, to_string(input->get_element(required_index)));
           values.push_back(input->get_element(required_index));
         }
       }
