@@ -557,18 +557,25 @@ TEST_F(TensorOpsTest, GetValuesIndexTest) {
   }
 
   // Get values at index for dilation_input = 2, padding = 1
-  logger->log(INFO, "Get values at index for dilation_input = 2, padding = 1");
+  logger->log(INFO, "Get values at index for dilation_input = 2, padding = 0");
   values = get_values_at_index(0, 1, 1, input_tensor, 2, 2, 0, 2);
   ASSERT_EQ(values.size(), 8);
-  ASSERT_FLOAT_EQ(values[0], 0.);
-  ASSERT_FLOAT_EQ(values[1], 0.);
-  ASSERT_FLOAT_EQ(values[2], 1.);
-  ASSERT_FLOAT_EQ(values[3], 2.);
-  // for (int i = 0; i < values.size(); i++) {
-  //   if (i % 2) {
-  //     ASSERT_FLOAT_EQ(values[i], 1.);
-  //   } else {
-  //     ASSERT_FLOAT_EQ(values[i], 0.);
-  //   }
-  // }
+  for (int i = 0; i < 6; i++) {
+    ASSERT_FLOAT_EQ(values[i], 0.);
+  }
+  ASSERT_FLOAT_EQ(values[6], 1.);
+  ASSERT_FLOAT_EQ(values[7], 2.);
+
+  // Get values at index for dilation_input = 2, padding = 2
+  logger->log(INFO, "Get values at index for dilation_input = 2, padding = 2");
+  values = get_values_at_index(0, 3, 3, input_tensor, 2, 2, 2, 2);
+  // Get values at index for dilation_input = 2, padding = 1
+  logger->log(INFO, "Get values at index for dilation_input = 2, padding = 0");
+  values = get_values_at_index(0, 1, 1, input_tensor, 2, 2, 0, 2);
+  ASSERT_EQ(values.size(), 8);
+  for (int i = 0; i < 6; i++) {
+    ASSERT_FLOAT_EQ(values[i], 0.);
+  }
+  ASSERT_FLOAT_EQ(values[6], 1.);
+  ASSERT_FLOAT_EQ(values[7], 2.);
 }
