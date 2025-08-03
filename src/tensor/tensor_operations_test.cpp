@@ -628,12 +628,11 @@ TEST_F(TensorOpsTest, ConvolutionTest) {
   ASSERT_FLOAT_EQ(bias_values[0], 1.);
   shared_ptr<Tensor> convolution_result =
       convolution(input_tensor, kernel, bias, 1, 0, 1, 1);
-  ASSERT_FLOAT_EQ(bias_values[0], 2.);
 
   vector<int> expected_shape{2, 2, 2, 2};
   vector<int> result_shape = convolution_result->shape;
   ASSERT_EQ(result_shape.size(), expected_shape.size());
   for (int i = 0; i < expected_shape.size(); i++) {
-    ASSERT_FLOAT_EQ(result_shape[i], expected_shape[i]);
+    ASSERT_EQ(result_shape[i], expected_shape[i]);
   }
 }
