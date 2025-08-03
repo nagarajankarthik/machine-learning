@@ -5,12 +5,13 @@ using namespace std;
 namespace ml {
 
 inline vector<int> broadcast_shape(vector<int> t1_shape, vector<int> t2_shape,
-                                   shared_ptr<Logger> logger) {
+                                   shared_ptr<Logger> logger,
+                                   int start_index = 2) {
   vector<int> new_shape{};
   int m = t1_shape.size();
   int n = t2_shape.size();
 
-  for (int i = 0; i < max(m, n); i++) {
+  for (int i = start_index; i < max(m, n); i++) {
     int first_index = m - 1 - i;
     int second_index = n - 1 - i;
     if (first_index < 0)
@@ -36,7 +37,7 @@ inline vector<int> broadcast_shape(vector<int> t1_shape, vector<int> t2_shape,
       }
     }
   }
-  new_shape.assign(new_shape.rbegin(), new_shape.rend());
+  reverse(new_shape.begin(), new_shape.end());
   return new_shape;
 }
 
@@ -134,16 +135,25 @@ inline shared_ptr<Tensor> add_batch_forward(const shared_ptr<Tensor> t1,
   int n = t2->shape.size();
 
   if (t1->shape[m - 2] != t2->shape[n - 2]) {
-    logger->log(ERROR, " Error in add_batch_forward: Input Tensors have "
-                       "different shapes at second last dimension.");
+    logger->log(ERROR, " Error in add_batch_forward: At the second last "
+                       "dimension, the shapes are  " +
+                           to_string(t1->shape[m - 2]) + " and " +
+                           to_string(t2->shape[n - 2]) +
+                           " for the two input tensors.");
     exit(1);
   }
 
   if (t1->shape[m - 1] != t2->shape[n - 1]) {
-    logger->log(ERROR, " Error in add_batch_forward: Input Tensors "
-                       "have different shapes at last dimension.");
+    logger->log(ERROR, " Error in add_batch_forward: At the last "
+                       "dimension, the shapes are  " +
+                           to_string(t1->shape[m - 1]) + " and " +
+                           to_string(t2->shape[n - 1]) +
+                           " for the two input tensors.");
     exit(1);
   }
+
+  new_shape.push_back(t1->shape[m - 2]);
+  new_shape.push_back(t1->shape[n - 1]);
 
   logger->log(INFO, "New shape for addition: " + to_string(new_shape.size()) +
                         " dimensions.");
@@ -159,6 +169,89 @@ inline shared_ptr<Tensor> add_batch_forward(const shared_ptr<Tensor> t1,
                                               t2, add_batch_backward);
   vector<int> new_position{};
   recurse_add_forward(t3, t1, t2, new_position);
+  return t3;
+}
+
+// Generic addition operation for two tensors unrelated to matrix addition
+
+inline void recurse_add_tensor_backward(shared_ptr<Tensor> t3,
+                                        shared_ptr<Tensor> t1,
+                                        shared_ptr<Tensor> t2,
+                                        vector<int> new_position,
+                                        int axis = 0) {
+
+  if (axis == t3->shape.size()) {
+    double g3 = t3->get_element(new_position, "gradients");
+    t1->set_element(new_position, g3, "gradients");
+    t2->set_element(new_position, g3, "gradients");
+    return;
+  }
+
+  new_position.push_back(0);
+  int position_index = new_position.size() - 1;
+
+  for (int i = 0; i < t3->shape[axis]; i++) {
+    new_position[position_index] = i;
+    recurse_add_tensor_backward(t3, t1, t2, new_position, axis + 1);
+  }
+  new_position.pop_back();
+}
+
+inline void add_tensor_backward(shared_ptr<Tensor> t3) {
+
+  shared_ptr<Tensor> t1 = t3->input_first;
+  if (!t1)
+    return;
+  shared_ptr<Tensor> t2 = t3->input_second;
+
+  shared_ptr<Logger> logger = t1->logger;
+
+  vector<int> new_position{};
+  recurse_add_tensor_backward(t3, t1, t2, new_position);
+}
+
+inline void recurse_add_tensor_forward(shared_ptr<Tensor> t3,
+                                       const shared_ptr<Tensor> t1,
+                                       const shared_ptr<Tensor> t2,
+                                       vector<int> new_position, int axis = 0) {
+
+  if (axis == t3->shape.size()) {
+    double v1 = t1->get_element(new_position);
+    double v2 = t2->get_element(new_position);
+    t3->set_element(new_position, v1 + v2);
+    return;
+  }
+
+  new_position.push_back(0);
+  int position_index = new_position.size() - 1;
+
+  for (int i = 0; i < t3->shape[axis]; i++) {
+    new_position[position_index] = i;
+    recurse_add_tensor_forward(t3, t1, t2, new_position, axis + 1);
+  }
+  new_position.pop_back();
+}
+
+inline shared_ptr<Tensor> add_tensor_forward(const shared_ptr<Tensor> t1,
+                                             const shared_ptr<Tensor> t2) {
+
+  shared_ptr<Logger> logger = t1->logger;
+  vector<int> new_shape = broadcast_shape(t1->shape, t2->shape, logger, 0);
+
+  logger->log(INFO, "New shape for addition: " + to_string(new_shape.size()) +
+                        " dimensions.");
+
+  int number_of_values = 1;
+  for (int i = 0; i < new_shape.size(); i++) {
+    number_of_values *= new_shape[i];
+  }
+
+  vector<double> sum_values(number_of_values, 0.);
+
+  shared_ptr<Tensor> t3 = make_shared<Tensor>(sum_values, new_shape, logger, t1,
+                                              t2, add_tensor_backward);
+  vector<int> new_position{};
+  recurse_add_tensor_forward(t3, t1, t2, new_position);
   return t3;
 }
 
@@ -180,6 +273,8 @@ inline vector<int> get_shape_after_matmul(shared_ptr<Tensor> t1,
                            to_string(t2->shape[n - 2]));
     exit(1);
   }
+  new_shape.push_back(t1->shape[m - 2]);
+  new_shape.push_back(t2->shape[n - 1]);
 
   return new_shape;
 }
@@ -1199,7 +1294,7 @@ inline shared_ptr<Tensor> convolution(shared_ptr<Tensor> input,
   };
   convolution_result->backward_function = conv_back;
   shared_ptr<Tensor> convolution_result_bias =
-      add_batch_forward(convolution_result, bias);
+      add_tensor_forward(convolution_result, bias);
   return convolution_result_bias;
 }
 
