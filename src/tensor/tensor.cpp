@@ -26,41 +26,14 @@ Tensor::Tensor(vector<double> values, vector<int> shape,
   this->backward_function = backward_function;
 };
 
-double Tensor::get_element(vector<int> position) {
-  int index = 0;
-  for (int i = 0; i < shape.size(); i++) {
-    index += strides[i] * position[i];
-  }
-  return values[index];
-}
-
-void Tensor::set_element(vector<int> position, double new_value) {
-  int index = 0;
-  for (int i = 0; i < shape.size(); i++) {
-    index += strides[i] * position[i];
-  }
-  values[index] = new_value;
-}
-
-void Tensor::swap_elements(vector<int> position_first,
-                           vector<int> position_second) {
-  int index_first = 0;
-  int index_second = 0;
-  for (int i = 0; i < shape.size(); i++) {
-    index_first += strides[i] * position_first[i];
-    index_second += strides[i] * position_second[i];
-  }
-  swap(values[index_first], values[index_second]);
-}
-
-vector<int> Tensor::broadcast_indices(vector<int> position) const {
+vector<int> Tensor::broadcast_indices(vector<int> position, int offset) const {
   list<int> position_list(position.begin(), position.end());
-  while (position_list.size() > shape.size() - 2) {
+  while (position_list.size() > shape.size() - offset) {
     position_list.pop_front();
   }
   vector<int> new_position(position_list.begin(), position_list.end());
 
-  if (new_position.size() != shape.size() - 2) {
+  if (new_position.size() != shape.size() - offset) {
     logger->log(ERROR, "The specified position has " +
                            to_string(new_position.size()) +
                            " indices, but the tensor has " +
@@ -86,6 +59,42 @@ vector<int> Tensor::broadcast_indices(vector<int> position) const {
   }
 
   return new_position;
+}
+
+double Tensor::get_element(vector<int> position, string item) {
+  int index = 0;
+  vector<int> new_position = broadcast_indices(position, 0);
+  for (int i = 0; i < new_position.size(); i++) {
+    index += strides[i] * new_position[i];
+  }
+  return item == "values" ? values[index] : gradients[index];
+}
+
+void Tensor::set_element(vector<int> position, double new_value, string item) {
+  int index = 0;
+  vector<int> new_position = broadcast_indices(position, 0);
+  for (int i = 0; i < new_position.size(); i++) {
+    index += strides[i] * new_position[i];
+  }
+  if (item == "values")
+    values[index] = new_value;
+  else if (item == "gradients")
+    gradients[index] += new_value;
+  else {
+    logger->log(ERROR, "Invalid item type in set_element: " + item);
+    exit(1);
+  }
+}
+
+void Tensor::swap_elements(vector<int> position_first,
+                           vector<int> position_second) {
+  int index_first = 0;
+  int index_second = 0;
+  for (int i = 0; i < shape.size(); i++) {
+    index_first += strides[i] * position_first[i];
+    index_second += strides[i] * position_second[i];
+  }
+  swap(values[index_first], values[index_second]);
 }
 
 void Tensor::get_subtensor(vector<vector<int>> new_shape, int axis, int offset,
@@ -116,7 +125,7 @@ vector<vector<double>> Tensor::get_matrix(vector<int> position,
   }
 
   // allow for broadcasting
-  vector<int> new_position = broadcast_indices(position);
+  vector<int> new_position = broadcast_indices(position, 2);
 
   int index = 0;
   for (int i = 0; i < new_position.size(); i++) {
@@ -155,7 +164,7 @@ void Tensor::set_matrix(vector<int> position,
   }
 
   // allow for broadcasting
-  vector<int> new_position = broadcast_indices(position);
+  vector<int> new_position = broadcast_indices(position, 2);
 
   int index = 0;
   for (int i = 0; i < new_position.size(); i++) {

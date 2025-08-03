@@ -77,12 +77,13 @@ public:
   /**
    * Function to support element indexing.
    */
-  double get_element(vector<int> position);
+  double get_element(vector<int> position, string item = "values");
 
   /**
    * Function to set values of individual elements.
    */
-  void set_element(vector<int> position, double new_value);
+  void set_element(vector<int> position, double new_value,
+                   string item = "values");
 
   /**
    * Function to swap values of two elements.
@@ -135,6 +136,6 @@ private:
   /**
    * Update indices to account for broadcasting
    */
-  vector<int> broadcast_indices(vector<int> position) const;
+  vector<int> broadcast_indices(vector<int> position, int offset = 0) const;
 };
 } // namespace ml
