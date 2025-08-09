@@ -635,4 +635,34 @@ TEST_F(TensorOpsTest, ConvolutionTest) {
   for (int i = 0; i < expected_shape.size(); i++) {
     ASSERT_EQ(result_shape[i], expected_shape[i]);
   }
+
+  unordered_map<int, double> expected_results;
+
+  for (int i = 0; i < expected_shape[0]; i++) {
+    for (int j = 0; j < expected_shape[1]; j++) {
+      // Calculate the index using szudzik's pairing function
+      int index = i >= j ? i * i + i + j : i + j * j;
+      if (i == 0 != j == 0)
+        expected_results[index] = 45.;
+      else if (i == 0 && j == 0)
+        expected_results[index] = 21.;
+      else
+        expected_results[index] = 101.;
+    }
+  }
+
+  // Check the values of the convolution result
+
+  for (int b = 0; b < expected_shape[0]; b++) {
+    for (int j = 0; j < expected_shape[1]; j++) {
+      for (int i = 0; i < expected_shape[2]; i++) {
+        for (int c = 0; c < expected_shape[3]; c++) {
+          int index = b >= c ? b * b + b + c : b + c * c;
+          ASSERT_FLOAT_EQ(
+              convolution_result->get_element(vector<int>{b, j, i, c}),
+              expected_results[index]);
+        }
+      }
+    }
+  }
 }
