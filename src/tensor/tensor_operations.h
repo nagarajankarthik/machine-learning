@@ -155,9 +155,6 @@ inline shared_ptr<Tensor> add_batch_forward(const shared_ptr<Tensor> t1,
   new_shape.push_back(t1->shape[m - 2]);
   new_shape.push_back(t1->shape[n - 1]);
 
-  logger->log(INFO, "New shape for addition: " + to_string(new_shape.size()) +
-                        " dimensions.");
-
   int number_of_values = 1;
   for (int i = 0; i < new_shape.size(); i++) {
     number_of_values *= new_shape[i];
@@ -237,9 +234,6 @@ inline shared_ptr<Tensor> add_tensor_forward(const shared_ptr<Tensor> t1,
 
   shared_ptr<Logger> logger = t1->logger;
   vector<int> new_shape = broadcast_shape(t1->shape, t2->shape, logger, 0);
-
-  logger->log(INFO, "New shape for addition: " + to_string(new_shape.size()) +
-                        " dimensions.");
 
   int number_of_values = 1;
   for (int i = 0; i < new_shape.size(); i++) {
@@ -975,12 +969,17 @@ inline void convolution_backward(shared_ptr<Tensor> convolution_result,
 
   vector<double> bias_values(convolution_result->shape[3], 0.);
   shared_ptr<Tensor> bias_tensor = make_shared<Tensor>(
-      bias_values, vector<int>{1, convolution_result->shape[3]},
-      convolution_result->logger);
+      bias_values, vector<int>{1, 1}, convolution_result->logger);
 
+  shared_ptr<Logger> logger = convolution_result->logger;
   shared_ptr<Tensor> gradient_tensor = make_shared<Tensor>(
       convolution_result->gradients, convolution_result->shape,
       convolution_result->logger);
+  logger->log(DEBUG,
+              "Gradient tensor shape: " + to_string(gradient_tensor->shape[0]) +
+                  ", " + to_string(gradient_tensor->shape[1]) + ", " +
+                  to_string(gradient_tensor->shape[2]) + ", " +
+                  to_string(gradient_tensor->shape[3]));
   shared_ptr<Tensor> convolution_input = convolution_result->input_first;
   shared_ptr<Tensor> convolution_kernel = convolution_result->input_second;
   flip_kernel(convolution_kernel);
@@ -994,8 +993,8 @@ inline void convolution_backward(shared_ptr<Tensor> convolution_result,
       convolution_input->shape[3], nullptr);
   for (int c = 0; c < convolution_kernel->shape[3]; c++) {
     vector<double> gradient_channel_values(convolution_result->shape[0] *
-                                               convolution_result->shape[1] *
-                                               convolution_result->shape[2],
+                                               convolution_input->shape[1] *
+                                               convolution_input->shape[2],
                                            0.);
     shared_ptr<Tensor> gradient_tensor_channel = make_shared<Tensor>(
         gradient_channel_values,
@@ -1023,6 +1022,8 @@ inline void convolution_backward(shared_ptr<Tensor> convolution_result,
       vector<vector<int>> gradient_index(kernel_index.begin(),
                                          kernel_index.end());
       gradient_index[0][1] = convolution_result->shape[0] - 1;
+      gradient_index[1][1] = convolution_result->shape[1] - 1;
+      gradient_index[2][1] = convolution_result->shape[2] - 1;
       gradient_index[3][0] = f;
       gradient_index[3][1] = f;
       vector<double> gradient_values{};
@@ -1038,6 +1039,19 @@ inline void convolution_backward(shared_ptr<Tensor> convolution_result,
       shared_ptr<Tensor> input_gradients_channel_filter =
           convolution(gradient_subtensor, kernel_tensor, bias_tensor, 1,
                       convolution_kernel->shape[1] - 1, stride, 1);
+      // logger->log(
+      //     DEBUG,
+      //     "Input gradients channel filter shape: " +
+      //         to_string(input_gradients_channel_filter->shape[0]) + ", " +
+      //         to_string(input_gradients_channel_filter->shape[1]) + ", " +
+      //         to_string(input_gradients_channel_filter->shape[2]) + ", " +
+      //         to_string(input_gradients_channel_filter->shape[3]));
+      // logger->log(DEBUG,
+      //             "Gradient tensor channel shape: " +
+      //                 to_string(gradient_tensor_channel->shape[0]) + ", " +
+      //                 to_string(gradient_tensor_channel->shape[1]) + ", " +
+      //                 to_string(gradient_tensor_channel->shape[2]) + ", " +
+      //                 to_string(gradient_tensor_channel->shape[3]));
       // Add the gradients to the channel of the gradient tensor
       for (int i = 0; i < input_gradients_channel_filter->values.size(); i++) {
         gradient_tensor_channel->values[i] +=
@@ -1297,5 +1311,4 @@ inline shared_ptr<Tensor> convolution(shared_ptr<Tensor> input,
       add_tensor_forward(convolution_result, bias);
   return convolution_result_bias;
 }
-
 } // namespace ml
