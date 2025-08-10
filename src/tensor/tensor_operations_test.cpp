@@ -666,3 +666,67 @@ TEST_F(TensorOpsTest, ConvolutionTest) {
     }
   }
 }
+
+TEST_F(TensorOpsTest, ConvolutionBackwardTest) {
+
+  // Create input tensor with shape (batch_size, height, width, channels)
+  vector<int> input_shape{2, 3, 3, 2};
+  int num_elements = 1;
+  for (int i = 0; i < input_shape.size(); i++) {
+    num_elements *= input_shape[i];
+  }
+  vector<double> input_values(num_elements, 1.);
+  shared_ptr<Tensor> input_tensor =
+      make_shared<Tensor>(input_values, input_shape, logger);
+
+  for (int j = 0; j < input_shape[1]; j++) {
+    for (int i = 0; i < input_shape[2]; i++) {
+      input_tensor->set_element(vector<int>{0, j, i, 0}, 1.);
+      input_tensor->set_element(vector<int>{0, j, i, 1}, 2.);
+      input_tensor->set_element(vector<int>{1, j, i, 0}, 3.);
+      input_tensor->set_element(vector<int>{1, j, i, 1}, 4.);
+    }
+  }
+
+  // Create kernel tensor with shape (number_filters, kernel_height,
+  // kernel_width, channels)
+  vector<int> kernel_shape{2, 2, 2, 2};
+  num_elements = 1;
+  for (int i = 0; i < kernel_shape.size(); i++) {
+    num_elements *= kernel_shape[i];
+  }
+  vector<double> kernel_values(num_elements, 1.);
+  for (int i = 0; i < num_elements; i++) {
+    if (i % 2) {
+      kernel_values[i] = 2.;
+    } else {
+      kernel_values[i] = 1.;
+    }
+  }
+  for (int i = 8; i < kernel_values.size(); i++) {
+    kernel_values[i] += 2.;
+  }
+
+  shared_ptr<Tensor> kernel =
+      make_shared<Tensor>(kernel_values, kernel_shape, logger);
+
+  // Initialize bias tensor with shape (1, number_filters).
+  vector<double> bias_values(kernel_shape[0], 1.);
+  shared_ptr<Tensor> bias =
+      make_shared<Tensor>(bias_values, vector<int>{1, kernel_shape[0]}, logger);
+
+  shared_ptr<Tensor> convolution_result =
+      convolution(input_tensor, kernel, bias, 1, 0, 1, 1);
+  for (int i = 0; i < convolution_result->gradients.size(); i++) {
+    convolution_result->gradients[i] = 1.;
+  }
+  convolution_result->backward();
+
+  // Check the gradients of the input tensor
+  ASSERT_FLOAT_EQ(
+      input_tensor->get_element(vector<int>{0, 0, 0, 0}, "gradients"), 4.);
+  ASSERT_FLOAT_EQ(
+      input_tensor->get_element(vector<int>{0, 0, 1, 0}, "gradients"), 8.);
+  ASSERT_FLOAT_EQ(
+      input_tensor->get_element(vector<int>{0, 0, 2, 0}, "gradients"), 4.);
+}
