@@ -65,9 +65,9 @@ double Tensor::get_element(vector<int> position, string item) {
   int index = 0;
   vector<int> new_position = broadcast_indices(position, 0);
   for (int i = 0; i < new_position.size(); i++) {
-    index += strides[i] * new_position[i];
+    index += strides.at(i) * new_position.at(i);
   }
-  return item == "values" ? values[index] : gradients[index];
+  return item == "values" ? values.at(index) : gradients.at(index);
 }
 
 void Tensor::set_element(vector<int> position, double new_value, string item) {
