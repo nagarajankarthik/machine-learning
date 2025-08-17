@@ -722,7 +722,7 @@ TEST_F(TensorOpsTest, ConvolutionBackwardTest) {
   }
   convolution_result->backward();
 
-  // Check the gradients of the input tensor
+  // Check the gradients with respect to the input tensor
   for (int b = 0; b < input_shape[0]; b++) {
     for (int j = 0; j < input_shape[1]; j++) {
       for (int i = 0; i < input_shape[2]; i++) {
@@ -747,4 +747,153 @@ TEST_F(TensorOpsTest, ConvolutionBackwardTest) {
       }
     }
   }
+
+  // Check the gradients with respect to the convolution kernel
+  for (int f = 0; f < kernel_shape[0]; f++) {
+    for (int j = 0; j < kernel_shape[1]; j++) {
+      for (int i = 0; i < kernel_shape[2]; i++) {
+        for (int c = 0; c < kernel_shape[3]; c++) {
+          double expected_gradient = 0.;
+          for (int v = 0; v < input_shape[1]; v++) {
+            for (int u = 0; u < input_shape[2]; u++) {
+              if ((v - j) >= 0 &&
+                  v + (kernel_shape[1] - 1 - j) < input_shape[1] &&
+                  (u - i) >= 0 &&
+                  u + (kernel_shape[2] - 1 - i) < input_shape[2]) {
+                for (int b = 0; b < input_shape[0]; b++) {
+                  expected_gradient += input_tensor->get_element(
+                      vector<int>{b, v, u, c}, "values");
+                }
+              }
+            }
+          }
+          ASSERT_FLOAT_EQ(
+              kernel->get_element(vector<int>{f, j, i, c}, "gradients"),
+              expected_gradient);
+        }
+      }
+    }
+  }
+
+  // Check the gradients with respect to the bias tensor
+  // for (int f = 0; f < bias->shape[1]; f++) {
+  //   ASSERT_FLOAT_EQ(bias->get_element(vector<int>{0, f}, "gradients"), 4.);
+  // }
+}
+
+TEST_F(TensorOpsTest, ConvolutionBackwardStrideTwoTest) {
+
+  // Create input tensor with shape (batch_size, height, width, channels)
+  vector<int> input_shape{2, 4, 4, 2};
+  int num_elements = 1;
+  for (int i = 0; i < input_shape.size(); i++) {
+    num_elements *= input_shape[i];
+  }
+  vector<double> input_values(num_elements, 1.);
+  shared_ptr<Tensor> input_tensor =
+      make_shared<Tensor>(input_values, input_shape, logger);
+
+  for (int j = 0; j < input_shape[1]; j++) {
+    for (int i = 0; i < input_shape[2]; i++) {
+      input_tensor->set_element(vector<int>{0, j, i, 0}, 1.);
+      input_tensor->set_element(vector<int>{0, j, i, 1}, 2.);
+      input_tensor->set_element(vector<int>{1, j, i, 0}, 3.);
+      input_tensor->set_element(vector<int>{1, j, i, 1}, 4.);
+    }
+  }
+
+  // Create kernel tensor with shape (number_filters, kernel_height,
+  // kernel_width, channels)
+  vector<int> kernel_shape{2, 2, 2, 2};
+  num_elements = 1;
+  for (int i = 0; i < kernel_shape.size(); i++) {
+    num_elements *= kernel_shape[i];
+  }
+  vector<double> kernel_values(num_elements, 1.);
+  for (int i = 0; i < num_elements; i++) {
+    if (i % 2) {
+      kernel_values[i] = 2.;
+    } else {
+      kernel_values[i] = 1.;
+    }
+  }
+  for (int i = 8; i < kernel_values.size(); i++) {
+    kernel_values[i] += 2.;
+  }
+
+  shared_ptr<Tensor> kernel =
+      make_shared<Tensor>(kernel_values, kernel_shape, logger);
+
+  // Initialize bias tensor with shape (1, number_filters).
+  vector<double> bias_values(kernel_shape[0], 1.);
+  shared_ptr<Tensor> bias =
+      make_shared<Tensor>(bias_values, vector<int>{1, kernel_shape[0]}, logger);
+
+  int stride = 2;
+  shared_ptr<Tensor> convolution_result =
+      convolution(input_tensor, kernel, bias, stride, 0, 1, 1);
+  for (int i = 0; i < convolution_result->gradients.size(); i++) {
+    convolution_result->gradients[i] = 1.;
+  }
+  convolution_result->backward();
+
+  // Check the gradients with respect to the input tensor
+  for (int b = 0; b < input_shape[0]; b++) {
+    for (int j = 0; j < input_shape[1]; j++) {
+      for (int i = 0; i < input_shape[2]; i++) {
+        for (int c = 0; c < input_shape[3]; c++) {
+          double expected_gradient = 0.;
+          for (int v = 0; v < kernel->shape[1]; v++) {
+            for (int u = 0; u < kernel->shape[2]; u++) {
+              if ((j - v) >= 0 &&
+                  j + (kernel->shape[1] - 1 - v) < input_shape[1] &&
+                  (i - u) >= 0 &&
+                  i + (kernel->shape[2] - 1 - u) < input_shape[2] &&
+                  (j - v) % stride == 0 && (i - u) % stride == 0) {
+                for (int f = 0; f < kernel->shape[0]; f++)
+                  expected_gradient +=
+                      kernel->get_element(vector<int>{f, v, u, c}, "values");
+              }
+            }
+          }
+          ASSERT_FLOAT_EQ(
+              input_tensor->get_element(vector<int>{b, j, i, c}, "gradients"),
+              expected_gradient);
+        }
+      }
+    }
+  }
+
+  // Check the gradients with respect to the convolution kernel
+  for (int f = 0; f < kernel_shape[0]; f++) {
+    for (int j = 0; j < kernel_shape[1]; j++) {
+      for (int i = 0; i < kernel_shape[2]; i++) {
+        for (int c = 0; c < kernel_shape[3]; c++) {
+          double expected_gradient = 0.;
+          for (int v = 0; v < input_shape[1]; v++) {
+            for (int u = 0; u < input_shape[2]; u++) {
+              if ((v - j) >= 0 &&
+                  v + (kernel_shape[1] - 1 - j) < input_shape[1] &&
+                  (u - i) >= 0 &&
+                  u + (kernel_shape[2] - 1 - i) < input_shape[2] &&
+                  (v - j) % stride == 0 && (u - i) % stride == 0) {
+                for (int b = 0; b < input_shape[0]; b++) {
+                  expected_gradient += input_tensor->get_element(
+                      vector<int>{b, v, u, c}, "values");
+                }
+              }
+            }
+          }
+          ASSERT_FLOAT_EQ(
+              kernel->get_element(vector<int>{f, j, i, c}, "gradients"),
+              expected_gradient);
+        }
+      }
+    }
+  }
+
+  // Check the gradients with respect to the bias tensor
+  // for (int f = 0; f < bias->shape[1]; f++) {
+  //   ASSERT_FLOAT_EQ(bias->get_element(vector<int>{0, f}, "gradients"), 4.);
+  // }
 }
