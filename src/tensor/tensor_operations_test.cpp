@@ -723,10 +723,28 @@ TEST_F(TensorOpsTest, ConvolutionBackwardTest) {
   convolution_result->backward();
 
   // Check the gradients of the input tensor
-  ASSERT_FLOAT_EQ(
-      input_tensor->get_element(vector<int>{0, 0, 0, 0}, "gradients"), 4.);
-  ASSERT_FLOAT_EQ(
-      input_tensor->get_element(vector<int>{0, 0, 1, 0}, "gradients"), 8.);
-  ASSERT_FLOAT_EQ(
-      input_tensor->get_element(vector<int>{0, 0, 2, 0}, "gradients"), 4.);
+  for (int b = 0; b < input_shape[0]; b++) {
+    for (int j = 0; j < input_shape[1]; j++) {
+      for (int i = 0; i < input_shape[2]; i++) {
+        for (int c = 0; c < input_shape[3]; c++) {
+          double expected_gradient = 0.;
+          for (int v = 0; v < kernel->shape[1]; v++) {
+            for (int u = 0; u < kernel->shape[2]; u++) {
+              if ((j - v) >= 0 &&
+                  j + (kernel->shape[1] - 1 - v) < input_shape[1] &&
+                  (i - u) >= 0 &&
+                  i + (kernel->shape[2] - 1 - u) < input_shape[2]) {
+                for (int f = 0; f < kernel->shape[0]; f++)
+                  expected_gradient +=
+                      kernel->get_element(vector<int>{f, v, u, c}, "values");
+              }
+            }
+          }
+          ASSERT_FLOAT_EQ(
+              input_tensor->get_element(vector<int>{b, j, i, c}, "gradients"),
+              expected_gradient);
+        }
+      }
+    }
+  }
 }
