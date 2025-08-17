@@ -468,10 +468,15 @@ inline void recurse_concatenate_forward(shared_ptr<Tensor> t3,
         current_gradients = t1->get_matrix(new_position, "gradients");
       } else {
         current_matrix = t2->get_matrix(new_position, "values");
+        // t2->logger->log(DEBUG, "Matrix values for second tensor: " +
+        //                            to_string(current_matrix[0][0]));
         current_gradients = t2->get_matrix(new_position, "gradients");
       }
-      t3->set_matrix(new_position, current_matrix, "values");
-      t3->set_matrix(new_position, current_gradients, "gradients");
+      vector<int> new_pos(new_position.begin(), new_position.end());
+      if (!use_first)
+        new_pos[concat_dim] += t1->shape[concat_dim];
+      t3->set_matrix(new_pos, current_matrix, "values");
+      t3->set_matrix(new_pos, current_gradients, "gradients");
     } else if (concat_dim == axis) {
       vector<vector<double>> first_matrix =
           t1->get_matrix(new_position, "values");
@@ -975,11 +980,6 @@ inline void convolution_backward(shared_ptr<Tensor> convolution_result,
   shared_ptr<Tensor> gradient_tensor = make_shared<Tensor>(
       convolution_result->gradients, convolution_result->shape,
       convolution_result->logger);
-  logger->log(DEBUG,
-              "Gradient tensor shape: " + to_string(gradient_tensor->shape[0]) +
-                  ", " + to_string(gradient_tensor->shape[1]) + ", " +
-                  to_string(gradient_tensor->shape[2]) + ", " +
-                  to_string(gradient_tensor->shape[3]));
   shared_ptr<Tensor> convolution_input = convolution_result->input_first;
   shared_ptr<Tensor> convolution_kernel = convolution_result->input_second;
   flip_kernel(convolution_kernel);
