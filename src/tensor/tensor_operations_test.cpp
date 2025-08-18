@@ -884,6 +884,9 @@ TEST_F(TensorOpsTest, ConvolutionBackwardStrideTwoTest) {
               }
             }
           }
+	  logger->log(DEBUG, "Expected gradient for kernel element " + to_string(f) +
+	      ", " + to_string(j) + ", " + to_string(i) + ", " +
+	      to_string(c) + ": " + to_string(expected_gradient));
           ASSERT_FLOAT_EQ(
               kernel->get_element(vector<int>{f, j, i, c}, "gradients"),
               expected_gradient);
