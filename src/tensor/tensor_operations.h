@@ -1104,16 +1104,24 @@ inline void convolution_backward(shared_ptr<Tensor> convolution_result,
         shared_ptr<Tensor> kernel_filter_gradients =
             convolution(convolution_input_subtensor, gradient_subtensor,
                         bias_tensor, 1, 0, 1, stride);
+	logger->log(DEBUG, "Number of values in kernel_filter_gradients: " +
+			    to_string(kernel_filter_gradients->values.size()));
+	logger->log(DEBUG, "Minimum scalar value in kernel_filter_gradients: " +
+			    to_string(*min_element(kernel_filter_gradients->values.begin(), kernel_filter_gradients->values.end())));
         // Add the gradients to the kernel
         for (int i = 0; i < kernel_filter_gradients->values.size(); i++) {
           gradients_filter_channel[i] += kernel_filter_gradients->values[i];
         }
+	logger->log(DEBUG, "Minimum scalar value in gradients_filter_channel: " +
+			    to_string(*min_element(gradients_filter_channel.begin(), gradients_filter_channel.end())));
       }
       shared_ptr<Tensor> kernel_gradients_channel_single =
           make_shared<Tensor>(gradients_filter_channel,
                               vector<int>{1, convolution_kernel->shape[1],
                                           convolution_kernel->shape[2], 1},
                               convolution_result->logger);
+      // logger->log(DEBUG, "Minimum scalar value in kernel_gradients_channel_single: " +
+			    // to_string(*min_element(kernel_gradients_channel_single->values.begin(), kernel_gradients_channel_single->values.end())));
       kernel_gradients_channels[c] = kernel_gradients_channel_single;
     }
     shared_ptr<Tensor> kernel_gradients_filter_single =
