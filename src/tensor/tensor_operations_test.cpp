@@ -580,7 +580,7 @@ TEST_F(TensorOpsTest, GetValuesIndexTest) {
 TEST_F(TensorOpsTest, ConvolutionTest) {
 
   // Create input tensor with shape (batch_size, height, width, channels)
-  vector<int> input_shape{2, 3, 3, 2};
+  vector<int> input_shape{2, 4, 4, 2};
   int num_elements = 1;
   for (int i = 0; i < input_shape.size(); i++) {
     num_elements *= input_shape[i];
@@ -625,7 +625,7 @@ TEST_F(TensorOpsTest, ConvolutionTest) {
   shared_ptr<Tensor> bias =
       make_shared<Tensor>(bias_values, vector<int>{1, kernel_shape[0]}, logger);
 
-  int stride = 1, padding = 0, dilation_input = 1, dilation_kernel = 1;
+  int stride = 2, padding = 1, dilation_input = 2, dilation_kernel = 2;
 
   int number_filters = kernel->shape[0];
   int kernel_height = kernel->shape[1];
