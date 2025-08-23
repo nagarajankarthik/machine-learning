@@ -400,29 +400,16 @@ inline void recurse_concatenate_backward(const shared_ptr<Tensor> t3,
                                          int axis = 0, int concat_dim = 0,
                                          bool use_first = true) {
 
-  if (axis == t3->shape.size() - 2) {
-    vector<vector<double>> g3 = t3->get_matrix(new_position, "gradients");
-    if (concat_dim < axis) {
-      if (use_first)
-        t1->set_matrix(new_position, g3, "gradients");
-      else
-        t2->set_matrix(new_position, g3, "gradients");
-    } else if (concat_dim == axis) {
-      vector<vector<double>> g1{}, g2{};
-      g1.assign(g3.begin(), g3.begin() + t1->shape[axis]);
-      g2.assign(g3.begin() + t1->shape[axis], g3.end());
-      t1->set_matrix(new_position, g1, "gradients");
-      t2->set_matrix(new_position, g2, "gradients");
-    } else if (concat_dim == axis + 1) {
-      vector<double> tmp{};
-      vector<vector<double>> g1(t1->shape[axis], tmp), g2(t1->shape[axis], tmp);
-      for (int i = 0; i < t1->shape[axis]; i++) {
-        g1[i].assign(g3[i].begin(), g3[i].begin() + t1->shape[axis + 1]);
-        g2[i].assign(g3[i].begin() + t1->shape[axis + 1], g3[i].end());
-      }
-      t1->set_matrix(new_position, g1, "gradients");
-      t2->set_matrix(new_position, g2, "gradients");
-    }
+  if (axis == t3->shape.size()) {
+    vector<int> new_pos(new_position.begin(), new_position.end());
+    if (!use_first)
+      new_pos[concat_dim] += t1->shape[concat_dim];
+    double g3 = t3->get_element(new_pos, "gradients");
+    if (use_first)
+      t1->set_element(new_position, g3, "gradients");
+    else
+      t2->set_element(new_position, g3, "gradients");
+    return;
   }
 
   new_position.push_back(0);
@@ -460,58 +447,16 @@ inline void recurse_concatenate_forward(shared_ptr<Tensor> t3,
                                         int concat_dim = 0,
                                         bool use_first = true) {
 
-  if (axis == t3->shape.size() - 2) {
-    if (concat_dim < axis) {
-      vector<vector<double>> current_matrix{}, current_gradients{};
-      if (use_first) {
-        current_matrix = t1->get_matrix(new_position, "values");
-        current_gradients = t1->get_matrix(new_position, "gradients");
-      } else {
-        current_matrix = t2->get_matrix(new_position, "values");
-        // t2->logger->log(DEBUG, "Matrix values for second tensor: " +
-        //                            to_string(current_matrix[0][0]));
-        current_gradients = t2->get_matrix(new_position, "gradients");
-      }
-      vector<int> new_pos(new_position.begin(), new_position.end());
-      if (!use_first)
-        new_pos[concat_dim] += t1->shape[concat_dim];
-      t3->set_matrix(new_pos, current_matrix, "values");
-      t3->set_matrix(new_pos, current_gradients, "gradients");
-    } else if (concat_dim == axis) {
-      vector<vector<double>> first_matrix =
-          t1->get_matrix(new_position, "values");
-      vector<vector<double>> first_gradients =
-          t1->get_matrix(new_position, "gradients");
-      vector<vector<double>> second_matrix =
-          t2->get_matrix(new_position, "values");
-      vector<vector<double>> second_gradients =
-          t2->get_matrix(new_position, "gradients");
-      first_matrix.insert(first_matrix.end(), second_matrix.begin(),
-                          second_matrix.end());
-      first_gradients.insert(first_gradients.end(), second_gradients.begin(),
-                             second_gradients.end());
-      t3->set_matrix(new_position, first_matrix, "values");
-      t3->set_matrix(new_position, first_gradients, "gradients");
-    } else if (concat_dim == axis + 1) {
-      vector<vector<double>> first_matrix =
-          t1->get_matrix(new_position, "values");
-      vector<vector<double>> first_gradients =
-          t1->get_matrix(new_position, "gradients");
-      vector<vector<double>> second_matrix =
-          t2->get_matrix(new_position, "values");
-      vector<vector<double>> second_gradients =
-          t2->get_matrix(new_position, "gradients");
-      for (int i = 0; i < first_matrix.size(); i++) {
-        first_matrix[i].insert(first_matrix[i].end(), second_matrix[i].begin(),
-                               second_matrix[i].end());
-        first_gradients[i].insert(first_gradients[i].end(),
-                                  second_gradients[i].begin(),
-                                  second_gradients[i].end());
-      }
-      t3->set_matrix(new_position, first_matrix, "values");
-      t3->set_matrix(new_position, first_gradients, "gradients");
-    }
-
+  if (axis == t3->shape.size()) {
+    vector<int> new_pos(new_position.begin(), new_position.end());
+    if (!use_first)
+      new_pos[concat_dim] += t1->shape[concat_dim];
+    double value = use_first ? t1->get_element(new_position)
+                             : t2->get_element(new_position);
+    double gradient = use_first ? t1->get_element(new_position, "gradients")
+                                : t2->get_element(new_position, "gradients");
+    t3->set_element(new_pos, value);
+    t3->set_element(new_pos, gradient, "gradients");
     return;
   }
 
@@ -577,6 +522,191 @@ inline shared_ptr<Tensor> concatenate_forward(shared_ptr<Tensor> t1,
       vector<double>(new_size, 0.), new_shape, logger, t1, t2, concat_back);
   vector<int> new_position{};
   recurse_concatenate_forward(t3, t1, t2, new_position, 0, concat_dim);
+  return t3;
+}
+
+inline void recurse_concatenate_backward_matrix(
+    const shared_ptr<Tensor> t3, shared_ptr<Tensor> t1, shared_ptr<Tensor> t2,
+    vector<int> &new_position, int axis = 0, int concat_dim = 0,
+    bool use_first = true) {
+
+  if (axis == t3->shape.size() - 2) {
+    vector<vector<double>> g3 = t3->get_matrix(new_position, "gradients");
+    if (concat_dim < axis) {
+      if (use_first)
+        t1->set_matrix(new_position, g3, "gradients");
+      else
+        t2->set_matrix(new_position, g3, "gradients");
+    } else if (concat_dim == axis) {
+      vector<vector<double>> g1{}, g2{};
+      g1.assign(g3.begin(), g3.begin() + t1->shape[axis]);
+      g2.assign(g3.begin() + t1->shape[axis], g3.end());
+      t1->set_matrix(new_position, g1, "gradients");
+      t2->set_matrix(new_position, g2, "gradients");
+    } else if (concat_dim == axis + 1) {
+      vector<double> tmp{};
+      vector<vector<double>> g1(t1->shape[axis], tmp), g2(t1->shape[axis], tmp);
+      for (int i = 0; i < t1->shape[axis]; i++) {
+        g1[i].assign(g3[i].begin(), g3[i].begin() + t1->shape[axis + 1]);
+        g2[i].assign(g3[i].begin() + t1->shape[axis + 1], g3[i].end());
+      }
+      t1->set_matrix(new_position, g1, "gradients");
+      t2->set_matrix(new_position, g2, "gradients");
+    }
+  }
+
+  new_position.push_back(0);
+  int position_index = new_position.size() - 1;
+
+  for (int i = 0; i < t3->shape[axis]; i++) {
+    new_position[position_index] = i;
+    if (axis == concat_dim && i >= t1->shape[axis]) {
+      use_first = false;
+      new_position[position_index] = i - t1->shape[axis];
+    }
+    recurse_concatenate_backward_matrix(t3, t1, t2, new_position, axis + 1,
+                                        concat_dim, use_first);
+  }
+  new_position.pop_back();
+}
+
+inline void concatenate_backward_matrix(shared_ptr<Tensor> t3, int concat_dim) {
+
+  shared_ptr<Tensor> t1 = t3->input_first;
+  if (!t1)
+    return;
+  shared_ptr<Tensor> t2 = t3->input_second;
+
+  shared_ptr<Logger> logger = t1->logger;
+
+  vector<int> new_position{};
+  recurse_concatenate_backward_matrix(t3, t1, t2, new_position, 0, concat_dim);
+}
+
+inline void recurse_concatenate_forward_matrix(shared_ptr<Tensor> t3,
+                                               shared_ptr<Tensor> t1,
+                                               shared_ptr<Tensor> t2,
+                                               vector<int> &new_position,
+                                               int axis = 0, int concat_dim = 0,
+                                               bool use_first = true) {
+
+  if (axis == t3->shape.size() - 2) {
+    if (concat_dim < axis) {
+      vector<vector<double>> current_matrix{}, current_gradients{};
+      if (use_first) {
+        current_matrix = t1->get_matrix(new_position, "values");
+        current_gradients = t1->get_matrix(new_position, "gradients");
+      } else {
+        current_matrix = t2->get_matrix(new_position, "values");
+        // t2->logger->log(DEBUG, "Matrix values for second tensor: " +
+        //                            to_string(current_matrix[0][0]));
+        current_gradients = t2->get_matrix(new_position, "gradients");
+      }
+      vector<int> new_pos(new_position.begin(), new_position.end());
+      if (!use_first)
+        new_pos[concat_dim] += t1->shape[concat_dim];
+      t3->set_matrix(new_pos, current_matrix, "values");
+      t3->set_matrix(new_pos, current_gradients, "gradients");
+    } else if (concat_dim == axis) {
+      vector<vector<double>> first_matrix =
+          t1->get_matrix(new_position, "values");
+      vector<vector<double>> first_gradients =
+          t1->get_matrix(new_position, "gradients");
+      vector<vector<double>> second_matrix =
+          t2->get_matrix(new_position, "values");
+      vector<vector<double>> second_gradients =
+          t2->get_matrix(new_position, "gradients");
+      first_matrix.insert(first_matrix.end(), second_matrix.begin(),
+                          second_matrix.end());
+      first_gradients.insert(first_gradients.end(), second_gradients.begin(),
+                             second_gradients.end());
+      t3->set_matrix(new_position, first_matrix, "values");
+      t3->set_matrix(new_position, first_gradients, "gradients");
+    } else if (concat_dim == axis + 1) {
+      vector<vector<double>> first_matrix =
+          t1->get_matrix(new_position, "values");
+      vector<vector<double>> first_gradients =
+          t1->get_matrix(new_position, "gradients");
+      vector<vector<double>> second_matrix =
+          t2->get_matrix(new_position, "values");
+      vector<vector<double>> second_gradients =
+          t2->get_matrix(new_position, "gradients");
+      for (int i = 0; i < first_matrix.size(); i++) {
+        first_matrix[i].insert(first_matrix[i].end(), second_matrix[i].begin(),
+                               second_matrix[i].end());
+        first_gradients[i].insert(first_gradients[i].end(),
+                                  second_gradients[i].begin(),
+                                  second_gradients[i].end());
+      }
+      t3->set_matrix(new_position, first_matrix, "values");
+      t3->set_matrix(new_position, first_gradients, "gradients");
+    }
+
+    return;
+  }
+
+  new_position.push_back(0);
+  int position_index = new_position.size() - 1;
+
+  for (int i = 0; i < t3->shape[axis]; i++) {
+    new_position[position_index] = i;
+    if (axis == concat_dim && i >= t1->shape[axis]) {
+      use_first = false;
+      new_position[position_index] = i - t1->shape[axis];
+    }
+    recurse_concatenate_forward_matrix(t3, t1, t2, new_position, axis + 1,
+                                       concat_dim, use_first);
+  }
+  new_position.pop_back();
+}
+
+inline shared_ptr<Tensor> concatenate_forward_matrix(shared_ptr<Tensor> t1,
+                                                     shared_ptr<Tensor> t2,
+                                                     int concat_dim = 0) {
+  vector<int> first_shape = t1->shape;
+  vector<int> second_shape = t2->shape;
+  shared_ptr<Logger> logger = t1->logger;
+
+  if (first_shape.size() != second_shape.size()) {
+    logger->log(ERROR, "Error in concatenate_forward: Input "
+                       "Tensors have different shapes.");
+    exit(1);
+  }
+
+  for (int i = 0; i < first_shape.size(); i++) {
+    if (i != concat_dim && first_shape[i] != second_shape[i]) {
+      logger->log(ERROR, "Error in concatenate_forward: Input Tensors have "
+                         "different shapes along dimension " +
+                             to_string(i) + ".");
+      logger->log(ERROR,
+                  "Concatenation dimension is " + to_string(concat_dim) + ".");
+      exit(1);
+    }
+  }
+
+  vector<int> new_shape = first_shape;
+  new_shape[concat_dim] += second_shape[concat_dim];
+  int new_size = t1->values.size() + t2->values.size();
+  /**
+   * See
+   * https://stackoverflow.com/questions/30217956/error-variable-cannot-be-implicitly-captured-because-no-default-capture-mode-h
+   * https://stackoverflow.com/questions/55124517/stdfunction-and-stdbind-return-value
+   * As explained in the second of the two links above, the next 3 lines
+   * of code are commented out because the lambda function method is
+   * preferred over the std::bind method
+   */
+
+  // std::function<void(shared_ptr<Tensor>)> concat_back =
+  //     std::bind(concatenate_backward, std::placeholders::_1,
+  //     concat_dim);
+  auto concat_back = [concat_dim](shared_ptr<Tensor> t3) {
+    concatenate_backward_matrix(t3, concat_dim);
+  };
+
+  shared_ptr<Tensor> t3 = make_shared<Tensor>(
+      vector<double>(new_size, 0.), new_shape, logger, t1, t2, concat_back);
+  vector<int> new_position{};
+  recurse_concatenate_forward_matrix(t3, t1, t2, new_position, 0, concat_dim);
   return t3;
 }
 
