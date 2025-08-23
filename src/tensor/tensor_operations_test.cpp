@@ -813,9 +813,13 @@ TEST_F(TensorOpsTest, ConvolutionBackwardTest) {
   }
 
   // Check the gradients with respect to the bias tensor
-  // for (int f = 0; f < bias->shape[1]; f++) {
-  //   ASSERT_FLOAT_EQ(bias->get_element(vector<int>{0, f}, "gradients"), 4.);
-  // }
+  int number_elements_per_filter = convolution_result->shape[0] *
+                                   convolution_result->shape[1] *
+                                   convolution_result->shape[2];
+  for (int f = 0; f < bias->shape[1]; f++) {
+    ASSERT_FLOAT_EQ(bias->get_element(vector<int>{0, f}, "gradients"),
+                    number_elements_per_filter);
+  }
 }
 
 TEST_F(TensorOpsTest, ConvolutionBackwardStrideTwoTest) {
@@ -930,7 +934,11 @@ TEST_F(TensorOpsTest, ConvolutionBackwardStrideTwoTest) {
   }
 
   // Check the gradients with respect to the bias tensor
-  // for (int f = 0; f < bias->shape[1]; f++) {
-  //   ASSERT_FLOAT_EQ(bias->get_element(vector<int>{0, f}, "gradients"), 4.);
-  // }
+  int number_elements_per_filter = convolution_result->shape[0] *
+                                   convolution_result->shape[1] *
+                                   convolution_result->shape[2];
+  for (int f = 0; f < bias->shape[1]; f++) {
+    ASSERT_FLOAT_EQ(bias->get_element(vector<int>{0, f}, "gradients"),
+                    number_elements_per_filter);
+  }
 }
