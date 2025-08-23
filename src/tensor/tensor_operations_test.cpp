@@ -625,42 +625,79 @@ TEST_F(TensorOpsTest, ConvolutionTest) {
   shared_ptr<Tensor> bias =
       make_shared<Tensor>(bias_values, vector<int>{1, kernel_shape[0]}, logger);
 
-  ASSERT_FLOAT_EQ(bias_values[0], 1.);
-  shared_ptr<Tensor> convolution_result =
-      convolution(input_tensor, kernel, bias, 1, 0, 1, 1);
+  int stride = 1, padding = 0, dilation_input = 1, dilation_kernel = 1;
 
-  vector<int> expected_shape{2, 2, 2, 2};
+  int number_filters = kernel->shape[0];
+  int kernel_height = kernel->shape[1];
+  int kernel_width = kernel->shape[2];
+  int channels = input_tensor->shape[3];
+  int batch_size = input_tensor->shape[0];
+  int height_input = input_tensor->shape[1];
+  int width_input = input_tensor->shape[2];
+  int width_effective = 1 + (width_input - 1) * dilation_input + 2 * padding;
+  int height_effective = 1 + (height_input - 1) * dilation_input + 2 * padding;
+  int dilated_kernel_height = 1 + dilation_kernel * (kernel_height - 1);
+  int dilated_kernel_width = 1 + dilation_kernel * (kernel_width - 1);
+  int width_output = 1 + (width_effective - dilated_kernel_width) / stride;
+  int height_output = 1 + (height_effective - dilated_kernel_height) / stride;
+
+  shared_ptr<Tensor> convolution_result =
+      convolution(input_tensor, kernel, bias, stride, padding, dilation_input,
+                  dilation_kernel);
+
+  vector<int> expected_shape{batch_size, height_output, width_output,
+                             number_filters};
   vector<int> result_shape = convolution_result->shape;
   ASSERT_EQ(result_shape.size(), expected_shape.size());
   for (int i = 0; i < expected_shape.size(); i++) {
     ASSERT_EQ(result_shape[i], expected_shape[i]);
   }
 
-  unordered_map<int, double> expected_results;
-
-  for (int i = 0; i < expected_shape[0]; i++) {
-    for (int j = 0; j < expected_shape[1]; j++) {
-      // Calculate the index using szudzik's pairing function
-      int index = i >= j ? i * i + i + j : i + j * j;
-      if (i == 0 != j == 0)
-        expected_results[index] = 45.;
-      else if (i == 0 && j == 0)
-        expected_results[index] = 21.;
-      else
-        expected_results[index] = 101.;
-    }
-  }
-
   // Check the values of the convolution result
-
   for (int b = 0; b < expected_shape[0]; b++) {
     for (int j = 0; j < expected_shape[1]; j++) {
       for (int i = 0; i < expected_shape[2]; i++) {
         for (int c = 0; c < expected_shape[3]; c++) {
-          int index = b >= c ? b * b + b + c : b + c * c;
-          ASSERT_FLOAT_EQ(
-              convolution_result->get_element(vector<int>{b, j, i, c}),
-              expected_results[index]);
+          double expected_value = 0.;
+          for (int v = 0; v < dilated_kernel_height; v++) {
+            for (int u = 0; u < dilated_kernel_width; u++) {
+              for (int ch = 0; ch < channels; ch++) {
+                int row_index = j * stride + v;
+                int col_index = i * stride + u;
+                double input_elem = 0.;
+                if (row_index < padding ||
+                    row_index > padding + (input_tensor->shape[1] - 1) *
+                                              dilation_input ||
+                    col_index < padding ||
+                    col_index > padding + (input_tensor->shape[2] - 1) *
+                                              dilation_input) {
+                  input_elem = 0.;
+                } else if ((row_index - padding) % dilation_input != 0 ||
+                           (col_index - padding) % dilation_input != 0) {
+                  input_elem = 0.;
+                } else {
+                  int row_index_input = (row_index - padding) / dilation_input;
+                  int col_index_input = (col_index - padding) / dilation_input;
+                  input_elem = input_tensor->get_element(
+                      vector<int>{b, row_index_input, col_index_input, ch},
+                      "values");
+                }
+                double kernel_elem = 0.;
+                if (v % dilation_kernel != 0 || u % dilation_kernel != 0) {
+                  kernel_elem = 0.;
+                } else {
+                  int v_kernel = v / dilation_kernel;
+                  int u_kernel = u / dilation_kernel;
+                  kernel_elem = kernel->get_element(
+                      vector<int>{c, v_kernel, u_kernel, ch}, "values");
+                }
+                expected_value += input_elem * kernel_elem;
+              }
+            }
+          }
+          ASSERT_FLOAT_EQ(expected_value + bias_values[c],
+                          convolution_result->get_element(
+                              vector<int>{b, j, i, c}, "values"));
         }
       }
     }
@@ -884,9 +921,6 @@ TEST_F(TensorOpsTest, ConvolutionBackwardStrideTwoTest) {
               }
             }
           }
-	  logger->log(DEBUG, "Expected gradient for kernel element " + to_string(f) +
-	      ", " + to_string(j) + ", " + to_string(i) + ", " +
-	      to_string(c) + ": " + to_string(expected_gradient));
           ASSERT_FLOAT_EQ(
               kernel->get_element(vector<int>{f, j, i, c}, "gradients"),
               expected_gradient);
