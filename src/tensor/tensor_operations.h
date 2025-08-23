@@ -1104,24 +1104,16 @@ inline void convolution_backward(shared_ptr<Tensor> convolution_result,
         shared_ptr<Tensor> kernel_filter_gradients =
             convolution(convolution_input_subtensor, gradient_subtensor,
                         bias_tensor, 1, 0, 1, stride);
-	logger->log(DEBUG, "Number of values in kernel_filter_gradients: " +
-			    to_string(kernel_filter_gradients->values.size()));
-	logger->log(DEBUG, "Minimum scalar value in kernel_filter_gradients: " +
-			    to_string(*min_element(kernel_filter_gradients->values.begin(), kernel_filter_gradients->values.end())));
         // Add the gradients to the kernel
         for (int i = 0; i < kernel_filter_gradients->values.size(); i++) {
           gradients_filter_channel[i] += kernel_filter_gradients->values[i];
         }
-	logger->log(DEBUG, "Minimum scalar value in gradients_filter_channel: " +
-			    to_string(*min_element(gradients_filter_channel.begin(), gradients_filter_channel.end())));
       }
       shared_ptr<Tensor> kernel_gradients_channel_single =
           make_shared<Tensor>(gradients_filter_channel,
                               vector<int>{1, convolution_kernel->shape[1],
                                           convolution_kernel->shape[2], 1},
                               convolution_result->logger);
-      // logger->log(DEBUG, "Minimum scalar value in kernel_gradients_channel_single: " +
-			    // to_string(*min_element(kernel_gradients_channel_single->values.begin(), kernel_gradients_channel_single->values.end())));
       kernel_gradients_channels[c] = kernel_gradients_channel_single;
     }
     shared_ptr<Tensor> kernel_gradients_filter_single =
@@ -1219,13 +1211,11 @@ inline shared_ptr<Tensor> convolution(shared_ptr<Tensor> input,
   int width_input = input->shape[2];
   int width_effective = 1 + (width_input - 1) * dilation_input + 2 * padding;
   int height_effective = 1 + (height_input - 1) * dilation_input + 2 * padding;
-  int width_output =
-      1 + (width_effective - dilation_kernel * kernel_width) / stride;
-  int height_output =
-      1 + (height_effective - dilation_kernel * kernel_height) / stride;
+  int dilated_kernel_height = 1 + dilation_kernel * (kernel_height - 1);
+  int dilated_kernel_width = 1 + dilation_kernel * (kernel_width - 1);
+  int width_output = 1 + (width_effective - dilated_kernel_width) / stride;
+  int height_output = 1 + (height_effective - dilated_kernel_height) / stride;
 
-  int dilated_kernel_height = dilation_kernel * kernel_height;
-  int dilated_kernel_width = dilation_kernel * kernel_width;
   vector<double> data_values(batch_size * height_output * width_output *
                                  dilated_kernel_height * dilated_kernel_width *
                                  channels,
@@ -1263,8 +1253,8 @@ inline shared_ptr<Tensor> convolution(shared_ptr<Tensor> input,
       number_filters,
   };
 
-  for (int j = 0; j < dilation_kernel * kernel_height; j++) {
-    for (int i = 0; i < dilation_kernel * kernel_width; i++) {
+  for (int j = 0; j < dilated_kernel_height; j++) {
+    for (int i = 0; i < dilated_kernel_width; i++) {
       for (int c = 0; c < channels; c++) {
         for (int f = 0; f < number_filters; f++) {
           int offset = j * dilated_kernel_width * channels * number_filters +
