@@ -1094,13 +1094,17 @@ inline shared_ptr<Tensor> convolution(shared_ptr<Tensor> input,
                                       int padding = 0, int dilation_input = 1,
                                       int dilation_kernel = 1);
 /**
- * Function to perform backward pass of convolution operation
+ * Function to perform backward pass of convolution operation.
+ * It is assumed that the value of dilation_input used in the forward pass is 1.
  * @param convolution_result: Tensor with shape (batch_size,
  * height_output, width_output, num_filters).
  * @param stride: Stride of the convolution for forward pass.
+ * @param padding: Padding used for forward pass.
+ * @param dilation_kernel: Dilation used for kernel in forward pass.
  */
 inline void convolution_backward(shared_ptr<Tensor> convolution_result,
-                                 int stride = 1) {
+                                 int stride = 1, int padding = 0,
+                                 int dilation_kernel = 1) {
 
   vector<double> bias_values(convolution_result->shape[3], 0.);
   shared_ptr<Tensor> bias_tensor = make_shared<Tensor>(
@@ -1165,24 +1169,60 @@ inline void convolution_backward(shared_ptr<Tensor> convolution_result,
                               convolution_result->logger);
       // Perform convolution with the kernel and the gradient tensor
       // shape of convolution_channel_filter is (batch_size, height, width, 1)
-      shared_ptr<Tensor> input_gradients_channel_filter =
-          convolution(gradient_subtensor, kernel_tensor, bias_tensor, 1,
-                      convolution_kernel->shape[1] - 1, stride, 1);
-      for (int i = 0; i < input_gradients_channel_filter->values.size(); i++) {
-        gradient_tensor_channel->values[i] +=
-            input_gradients_channel_filter->values[i];
+      shared_ptr<Tensor> input_gradients_channel_filter = convolution(
+          gradient_subtensor, kernel_tensor, bias_tensor, 1,
+          convolution_kernel->shape[1] - 1, stride, dilation_kernel);
+
+      for (int b = 0; b < convolution_input->shape[0]; b++) {
+        for (int h = 0; h < convolution_input->shape[1]; h++) {
+          for (int w = 0; w < convolution_input->shape[2]; w++) {
+            convolution_input->set_element(
+                vector<int>{b, h, w, c},
+                input_gradients_channel_filter->get_element(
+                    vector<int>{b, h + padding, w + padding, 0}),
+                "gradients");
+          }
+        }
       }
+      // for (int i = 0; i < input_gradients_channel_filter->values.size(); i++)
+      // {
+      //   gradient_tensor_channel->values[i] +=
+      //       input_gradients_channel_filter->values[i];
+      // }
     }
     input_gradients_channels[c] = gradient_tensor_channel;
   }
   // Concatenate the gradients for each channel to get the input gradients
-  shared_ptr<Tensor> input_gradients = input_gradients_channels[0];
-  for (int c = 1; c < input_gradients_channels.size(); c++) {
-    input_gradients =
-        concatenate_forward(input_gradients, input_gradients_channels[c], 3);
-  }
+  // shared_ptr<Tensor> input_gradients = input_gradients_channels[0];
+  // for (int c = 1; c < input_gradients_channels.size(); c++) {
+  //   input_gradients =
+  //       concatenate_forward(input_gradients, input_gradients_channels[c], 3);
+  // }
 
-  convolution_input->gradients = input_gradients->values;
+  // for (int b = 0; b < convolution_input->shape[0]; b++) {
+  //   for (int h = 0; h < convolution_input->shape[1]; h++) {
+  //     for (int w = 0; w < convolution_input->shape[2]; w++) {
+  //       for (int c = 0; c < convolution_input->shape[3]; c++) {
+  //         int convolution_input_index =
+  //             b * (convolution_input->shape[1] * convolution_input->shape[2]
+  //             *
+  //                  convolution_input->shape[3]) +
+  //             h * (convolution_input->shape[2] * convolution_input->shape[3])
+  //             + w * (convolution_input->shape[3]) + c;
+  //         int padded_height = h + padding;
+  //         int padded_width = w + padding;
+  //         int input_gradients_index =
+  //             b * (input_gradients->shape[1] * input_gradients->shape[2] *
+  //                  input_gradients->shape[3]) +
+  //             padded_height *
+  //                 (input_gradients->shape[2] * input_gradients->shape[3]) +
+  //             padded_width * (input_gradients->shape[3]) + c;
+  //         convolution_input->gradients[convolution_input_index] +=
+  //             input_gradients->values[input_gradients_index];
+  //       }
+  //     }
+  //   }
+  // }
 
   flip_kernel(convolution_kernel);
 
@@ -1233,7 +1273,7 @@ inline void convolution_backward(shared_ptr<Tensor> convolution_result,
         // Perform convolution with the kernel and the gradient tensor
         shared_ptr<Tensor> kernel_filter_gradients =
             convolution(convolution_input_subtensor, gradient_subtensor,
-                        bias_tensor, 1, 0, 1, stride);
+                        bias_tensor, 1, padding, 1, stride);
         // Add the gradients to the kernel
         for (int i = 0; i < kernel_filter_gradients->values.size(); i++) {
           gradients_filter_channel[i] += kernel_filter_gradients->values[i];
@@ -1260,7 +1300,32 @@ inline void convolution_backward(shared_ptr<Tensor> convolution_result,
     kernel_gradients =
         concatenate_forward(kernel_gradients, kernel_gradients_filters[f], 0);
   }
-  convolution_kernel->gradients = kernel_gradients->values;
+
+  for (int f = 0; f < kernel_gradients->shape[0]; f++) {
+    for (int h = 0; h < kernel_gradients->shape[1]; h++) {
+      for (int w = 0; w < kernel_gradients->shape[2]; w++) {
+        for (int c = 0; c < kernel_gradients->shape[3]; c++) {
+          if (h % dilation_kernel != 0 || w % dilation_kernel != 0)
+            continue;
+          int kernel_gradients_index =
+              f * (kernel_gradients->shape[1] * kernel_gradients->shape[2] *
+                   kernel_gradients->shape[3]) +
+              h * (kernel_gradients->shape[2] * kernel_gradients->shape[3]) +
+              w * (kernel_gradients->shape[3]) + c;
+          int h_kernel = h / dilation_kernel;
+          int w_kernel = w / dilation_kernel;
+          int convolution_kernel_index =
+              f * (convolution_kernel->shape[1] * convolution_kernel->shape[2] *
+                   convolution_kernel->shape[3]) +
+              h_kernel * (convolution_kernel->shape[2] *
+                          convolution_kernel->shape[3]) +
+              w_kernel * (convolution_kernel->shape[3]) + c;
+          convolution_kernel->gradients[convolution_kernel_index] +=
+              kernel_gradients->values[kernel_gradients_index];
+        }
+      }
+    }
+  }
 }
 
 /**
@@ -1318,7 +1383,8 @@ get_values_at_index(int batch, int width_start, int height_start,
  * @param bias: Tensor with shape (1, number_filters). Bias to be added
  * to result of convolution.
  * @param stride: Stride of the convolution.
- * @param padding: Padding of the convolution.
+ * @param padding: Padding of the convolution. All padding grid cells have value
+ * 0.
  * @param dilation: Dilation of the convolution.
  * @return conv_result: Tensor with shape (batch_size, (height -
  * kernel_height)/stride + 1, (width - kernel_width)/stride + 1,
@@ -1416,12 +1482,126 @@ inline shared_ptr<Tensor> convolution(shared_ptr<Tensor> input,
       {batch_size, height_output, width_output, number_filters});
   convolution_result->input_first = input;
   convolution_result->input_second = kernel;
-  auto conv_back = [stride](shared_ptr<Tensor> t3) {
-    convolution_backward(t3, stride);
+  auto conv_back = [stride, padding, dilation_kernel](shared_ptr<Tensor> t3) {
+    convolution_backward(t3, stride, padding, dilation_kernel);
   };
   convolution_result->backward_function = conv_back;
   shared_ptr<Tensor> convolution_result_bias =
       add_tensor_forward(convolution_result, bias);
   return convolution_result_bias;
 }
+/**
+ * Function to perform maximum pooling operation
+ * @param input: Tensor with shape (batch_size, height, width, channels)
+ * @param kernel_height: Height of the pooling kernel.
+ * @param kernel_width: Width of the pooling kernel.
+ * @param stride: Controls number of pixels to move between successive pooling
+ * operations.
+ * @param padding: Padding for the input tensor. All padding grid cells have
+ * value negative infinity.
+ * @param dilation_kernel: Dilation of the kernel.
+ * @return max_pool_result: Tensor with shape (batch_size, (height -
+ * kernel_height)/stride + 1, (width - kernel_width)/stride + 1,
+ * channels)
+ */
+inline shared_ptr<Tensor> max_pool(shared_ptr<Tensor> input, int kernel_height,
+                                   int kernel_width, int stride, int padding,
+                                   int dilation_kernel) {
+  shared_ptr<Logger> logger = input->logger;
+
+  // Update input to account for padding and dilation
+  int batch_size = input->shape[0];
+  int height_input = input->shape[1];
+  int width_input = input->shape[2];
+  int channels = input->shape[3];
+  int width_effective = width_input + 2 * padding;
+  int height_effective = height_input + 2 * padding;
+  int dilated_kernel_height = 1 + dilation_kernel * (kernel_height - 1);
+  int dilated_kernel_width = 1 + dilation_kernel * (kernel_width - 1);
+  int width_output = 1 + (width_effective - dilated_kernel_width) / stride;
+  int height_output = 1 + (height_effective - dilated_kernel_height) / stride;
+
+  vector<double> result_values(batch_size * height_output * width_output *
+                                   dilated_kernel_height *
+                                   dilated_kernel_width * channels,
+                               0.);
+  for (int b = 0; b < batch_size; b++) {
+    for (int c = 0; c < channels; c++) {
+      for (int j = 0; j < height_output; j++) {
+        for (int i = 0; i < width_output; i++) {
+          int row_start = j * stride;
+          int col_start = i * stride;
+          int offset = b * height_output * width_output * channels +
+                       j * width_output * channels + i * channels + c;
+          double max_value = -std::numeric_limits<double>::infinity();
+          for (int l = row_start; l < row_start + dilated_kernel_height; l++) {
+            for (int k = col_start; k < col_start + dilated_kernel_width; k++) {
+              max_value = max(max_value, input->get_element({b, l, k, 0}));
+            }
+          }
+          result_values[offset] = max_value;
+        }
+      }
+    }
+  }
+
+  vector<int> data_shape{batch_size * height_output * width_output,
+                         dilated_kernel_height * dilated_kernel_width *
+                             channels};
+  return input;
+}
+// shared_ptr<Tensor> data =
+//     make_shared<Tensor>(data_values, data_shape, logger);
+
+// vector<double> weights_values(number_filters * dilated_kernel_height *
+//                                   dilated_kernel_width * channels,
+//                               0.);
+// vector<int> weights_shape{
+//     dilated_kernel_height * dilated_kernel_width * channels,
+//     number_filters,
+// };
+
+// for (int j = 0; j < dilated_kernel_height; j++) {
+//   for (int i = 0; i < dilated_kernel_width; i++) {
+//     for (int c = 0; c < channels; c++) {
+//       for (int f = 0; f < number_filters; f++) {
+//         int offset = j * dilated_kernel_width * channels * number_filters +
+//                      i * channels * number_filters + c * number_filters +
+//                      f;
+//         if (j % dilation_kernel != 0 || i % dilation_kernel != 0)
+//           weights_values[offset] = 0;
+//         else {
+//           int j_ = j / dilation_kernel;
+//           int i_ = i / dilation_kernel;
+//           weights_values[offset] = kernel->get_element({f, j_, i_, c});
+//         }
+//       }
+//     }
+//   }
+// }
+
+// shared_ptr<Tensor> weights =
+//     make_shared<Tensor>(weights_values, weights_shape, logger);
+
+// // Define the following symbols:
+// // b: batch size
+// // h_r: height of convolution result
+// // w_r: width of convolution result
+// // nf: number of filters
+// // Shape of convolution_result: (b*h_r*w_r, nf)
+// shared_ptr<Tensor> convolution_result = batch_matmul_forward(data,
+// weights);
+
+// convolution_result->reshape(
+//     {batch_size, height_output, width_output, number_filters});
+// convolution_result->input_first = input;
+// convolution_result->input_second = kernel;
+// auto conv_back = [stride](shared_ptr<Tensor> t3) {
+//   convolution_backward(t3, stride);
+// };
+// convolution_result->backward_function = conv_back;
+// shared_ptr<Tensor> convolution_result_bias =
+//     add_tensor_forward(convolution_result, bias);
+// return convolution_result_bias;
+// }
 } // namespace ml
