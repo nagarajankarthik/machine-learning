@@ -871,8 +871,12 @@ TEST_F(TensorOpsTest, ConvolutionBackwardStrideTwoTest) {
       make_shared<Tensor>(bias_values, vector<int>{1, kernel_shape[0]}, logger);
 
   int stride = 2;
+  int padding = 1;
+  int dilation_input = 1;
+  int dilation_kernel = 1;
   shared_ptr<Tensor> convolution_result =
-      convolution(input_tensor, kernel, bias, stride, 0, 1, 1);
+      convolution(input_tensor, kernel, bias, stride, padding, dilation_input,
+                  dilation_kernel);
   for (int i = 0; i < convolution_result->gradients.size(); i++) {
     convolution_result->gradients[i] = 1.;
   }
@@ -886,11 +890,13 @@ TEST_F(TensorOpsTest, ConvolutionBackwardStrideTwoTest) {
           double expected_gradient = 0.;
           for (int v = 0; v < kernel->shape[1]; v++) {
             for (int u = 0; u < kernel->shape[2]; u++) {
-              if ((j - v) >= 0 &&
-                  j + (kernel->shape[1] - 1 - v) < input_shape[1] &&
-                  (i - u) >= 0 &&
-                  i + (kernel->shape[2] - 1 - u) < input_shape[2] &&
-                  (j - v) % stride == 0 && (i - u) % stride == 0) {
+              int jp = j + padding;
+              int ip = i + padding;
+              if ((jp - v) >= 0 &&
+                  jp + (kernel->shape[1] - 1 - v) < input_shape[1] + padding &&
+                  (ip - u) >= 0 &&
+                  ip + (kernel->shape[2] - 1 - u) < input_shape[2] + padding &&
+                  (jp - v) % stride == 0 && (ip - u) % stride == 0) {
                 for (int f = 0; f < kernel->shape[0]; f++)
                   expected_gradient +=
                       kernel->get_element(vector<int>{f, v, u, c}, "values");
