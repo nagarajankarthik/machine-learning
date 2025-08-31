@@ -24,7 +24,9 @@ $$
 
 , where $t$ is the bias term.
 
-The expressions for the upper bounds of $i$ and $j$ are explained at this [link](https://cs231n.github.io/convolutional-networks/). The padding for $\mathbf{I}$ was ignored in the above equation. Back-propagation of the loss through convolutional layers is an important issue that must be considered when when implementing such functionality. The remainder of this section will show that the backward pass through a convolutional layer can itself be implemented as a convolution.
+The expressions for the upper bounds of $i$ and $j$ are explained at this [link](https://cs231n.github.io/convolutional-networks/). Back-propagation of the loss through convolutional layers is an important issue that must be considered when when implementing such functionality. The remainder of this section will show that the backward pass through a convolutional layer can itself be implemented as a convolution.
+
+Although not included in the above equation, the current implementation of convolution allows for zero padding to be applied to the convolution input $\mathbf{I}(iS + a, jS + b)$ and dilation of the convolution kernel during the forward pass. The method of handling these two scenarios during the backward pass is explained in a subsequent section.
 
 The backward pass through a convolutional layer calculates the partial derivatives $\frac{\partial L}{\partial I(x, y)}$ for all $0 \le x < W$ and $0 \le y < H$, where $L$ is the magnitude of the loss. First note that
 
@@ -44,13 +46,13 @@ In the last expression, the sum over $a$ and $b$ is taken only in cases where $\
 
 To formulate the backward pass in terms of convolutions, the following two changes will be made:
 
-1. The stride, $S$, will be replaced with a dilation coefficient, $d$.
+1. The stride, $S$, will be replaced with a dilation coefficient, $\gamma$.
 2. A padding of $F-1$ will be added to the result of the convolution at both ends of the resulting matrix.
 
 As per the first change, the expression for convolution can be re-written as
 
 $$
-\mathbf{R}(i,j) = \gamma(i, j) \sum_{a=0}^{F-1} \sum_{b=0}^{F-1} \mathbf{I}(i + a, j + b) \mathbf{k}(a,b) + t \quad 0 \le i \le \lfloor W-F \rfloor, \quad 0 \le j \le \lfloor H-F \rfloor, \quad \gamma(i, j) = \begin{cases} 1 & \text{if } \mod(i, S) = 0 \text{ and } \mod(j, S) = 0 \\ 0 & \text{otherwise} \end{cases}
+\mathbf{R}(i,j) = \gamma(i, j) \sum_{a=0}^{F-1} \sum_{b=0}^{F-1} \mathbf{I}(i + a, j + b) \mathbf{k}(a,b) + t \quad 0 \le i \le \lfloor W-F \rfloor, \quad 0 \le j \le \lfloor H-F \rfloor, \quad \gamma(i, j) = \begin{cases} 1 & \text{if } \mod(i, S) = 0 \\ 0 & \text{otherwise} \end{cases}
 $$
 
 The above expression indicates that the convolution is always performed with stride 1. Therefore, the output matrix $\mathbf{R}$ will always have $W - F + 1$ columns and $H - F + 1$ rows. The inclusion of the dilation factor, $\gamma(i, j)$, ensures that entries of the output matrix that would not exist when using the actual value of stride are set to zero. In the actual implementation, the first equation that explicitly includes the stride is used in the forward pass. The presence of additional zero entries that would be obtained using the last of the above equations is accounted for in the backward pass.
@@ -60,14 +62,14 @@ With this change, the partial derivative of loss with respect to the input is gi
 $$
 \frac{\partial L}{\partial \mathbf{I}(x, y)} = \sum_{i=0}^{W - F} \sum_{j = 0}^{H - F} \frac{\partial L}{\partial \mathbf{R}(i, j)}\frac{\partial \mathbf{R}(i, j)}{\partial \mathbf{I}(x, y)} \\
 = \sum_{i=0}^{W - F} \sum_{j=0}^{H - F} \gamma(i, j) \frac{\partial L}{\partial \mathbf{R}(i, j)} \sum_{a=0}^{F-1} \sum_{b=0}^{F-1} \delta_{i + a, x} \delta_{j + b, y} \mathbf{k}(a, b) \\
-= \sum_{a=0}^{F-1} \sum_{b=0}^{F-1} d(x - a, y - b) \frac{\partial L}{\partial \mathbf{R}(x - a, y - b)} \mathbf{k}(a, b) \\
+= \sum_{a=0}^{F-1} \sum_{b=0}^{F-1} \gamma(x - a, y - b) \frac{\partial L}{\partial \mathbf{R}(x - a, y - b)} \mathbf{k}(a, b) \\
 $$
 
 One can introduce the change of variables $a' = (F - 1) - a$ and $b' = (F - 1) - b$ in the last expression of the above equation to obtain
 
 $$
 \frac{\partial L}{\partial \mathbf{I}(x, y)}
-= \sum_{a' = 0}^{F - 1} \sum_{b' = 0}^{F - 1} d(x - (F - 1) + a', y - (F - 1) + b') \frac{\partial L}{\partial \mathbf{R}(x - (F - 1) + a', y - (F - 1) + b')} \mathbf{k}((F - 1) - a', (F - 1) -  b') \\
+= \sum_{a' = 0}^{F - 1} \sum_{b' = 0}^{F - 1} \gamma(x - (F - 1) + a', y - (F - 1) + b') \frac{\partial L}{\partial \mathbf{R}(x - (F - 1) + a', y - (F - 1) + b')} \mathbf{k}((F - 1) - a', (F - 1) -  b') \\
 $$
 
 The above equation still cannot be interpreted as a convolution since the sum cannot be taken over all values of $a'$ and $b'$ for certain values of $x$ and $y$. For example, $a'$ can only be $F - 1$ when $x = 0$ and $b'$ can only be $F - 1$ when $y = 0$. This shortcoming can be remedied by the introduction of padding of $F - 1$ at both ends of the matrix $\mathbf{R}$.
@@ -76,7 +78,7 @@ This implies that $x$ is replaced by $x + (F - 1)$ and $y$ is replaced by $y + (
 
 $$
 \frac{\partial L}{\partial \mathbf{I}(x, y)}
-= \sum_{a = 0}^{F - 1} \sum_{b = 0}^{F - 1} d(x + a, y + b) \frac{\partial L}{\partial \mathbf{R}(x + a, y + b)} \mathbf{k}_r(a, b) \\
+= \sum_{a = 0}^{F - 1} \sum_{b = 0}^{F - 1} \gamma(x + a, y + b) \frac{\partial L}{\partial \mathbf{R}(x + a, y + b)} \mathbf{k}_r(a, b) \\
 $$
 
 , where $a'$ and $b'$ have been replaced with $a$ and $b$ for notational convenience. Also, $\mathbf{k}_r(a, b)$ is defined as $\mathbf{k}((F - 1) - a, (F - 1) - b)$.
@@ -84,14 +86,14 @@ $$
 The incorporation of padding of $F - 1$ at both ends of the matrix $\mathbf{R}$ ensures that the indices into $\frac{\partial L}{\partial \mathbf{R}}$ are always valid.
 Notice that the last equation is now of the same form as the first equation in this section defining the convolution operation.
 
-In the actual implementation, the forward pass is performed using the first equation for the convolution operation in this sub-section that includes the stride $S$ but not the dilation factor $d$. This implies that the convolution result $R$ will have $\frac{H - F}{S} + 1$ rows and $\frac{W - F}{S} + 1$ columns. Next, dilation is performed along the width and height dimensions by inserting $S - 1$ zeros following all but the last entry. These zeros reflect the elements that were 'missed' as a result of $S$ being greater than one. Mathematically the number of elements along the width dimension changes as
+In the actual implementation, the forward pass is performed using the first equation for the convolution operation in this sub-section that includes the stride $S$ but not the dilation factor $\gamma$. This implies that the convolution result $R$ will have $\frac{H - F}{S} + 1$ rows and $\frac{W - F}{S} + 1$ columns. Next, dilation is performed along the width and height dimensions by inserting $S - 1$ zeros following all but the last entry. These zeros reflect the elements that were 'missed' as a result of $S$ being greater than one. Mathematically the number of elements along the width dimension changes as
 
 $$
 \frac{W - F}{S} + 1 \implies \frac{W - F}{S} \implies W - F \implies W - F + 1
 $$
 
 
-This procedure effectively yields the values of $d(x + a, y + b) \frac{\partial L}{\partial \mathbf{R}(x + a, y + b)}$ by setting $\frac{\partial L}{\partial \mathbf{R}(x + a, y + b)} = 0$, whenever $d(x + a, y + b) = 0$ and leaving the remaining values unchanged.
+This procedure effectively yields the values of $\gamma(x + a, y + b) \frac{\partial L}{\partial \mathbf{R}(x + a, y + b)}$ by setting $\frac{\partial L}{\partial \mathbf{R}(x + a, y + b)} = 0$, whenever $d(x + a, y + b) = 0$ and leaving the remaining values unchanged.
 
 Finally, the partial derivative of loss with respect to the kernel is given by
 
@@ -164,11 +166,44 @@ $$
 \begin{flalign*}
 \frac{\partial L}{\partial \mathbf{k}(h, c, d, r)} &= \sum_{w = 0}^{N - 1} \sum_{i=0}^{W - F} \sum_{j = 0}^{H - F} \sum_{g=0}^{Q-1} \frac{\partial L}{\partial \mathbf{R}(w, i, j, g)}\frac{\partial \mathbf{R}(w, i, j, g)}{\partial \mathbf{k}(h, c, d, r)} \\
 &= \sum_{w = 0}^{N - 1} \sum_{i=0}^{W - F} \sum_{j=0}^{H - F} \sum_{g=0}^{Q-1} \gamma(i, j) \frac{\partial L}{\partial \mathbf{R}(w, i, j, g)} \sum_{p = 0}^{C - 1}\sum_{a=0}^{F-1} \sum_{b=0}^{F-1} \mathbf{I}(i + a, j + b, p) \delta_{a, c} \delta_{b, d} \delta_{p, r} \delta_{gh} \\
-&= \sum_{w = 0}^{N - 1} \sum_{i=0}^{W - F} \sum_{j=0}^{H - F} \gamma(i, j) \frac{\partial L}{\partial \mathbf{R}(w, i, j, g)}  \mathbf{I}(c + i, d + j, r) \\
+&= \sum_{w = 0}^{N - 1} \sum_{i=0}^{W - F} \sum_{j=0}^{H - F} \gamma(i, j) \frac{\partial L}{\partial \mathbf{R}(w, i, j, h)}  \mathbf{I}(c + i, d + j, r) \\
 \end{flalign*}
 $$
 
-References:
+## Handling padding of convolution input and dilation of convolution kernel
+
+The above derivations assumed that no padding is applied to the convolution input and that the dilation factor of the convolution kernel is 1. This section explains how these two scenarios are handled in the actual implementation.
+
+In the forward pass, one first calculates the shape of the convolution kernel along the height and width dimensions after dilation. The height and width of the convolution kernel are assumed to be equal. Let $F$ and $F_d$ denote the size of the kernel before and after dilation respectively. Then, $F_d$ is given by
+
+$$
+F_d = 1 + d_f * (F - 1)
+$$
+, where $d_f$ is the dilation factor.
+
+The value of $F_d$ is then used to evaluate the shape of the output tensor along the width and height dimensions. The width of the convolution output, denoted by $W_{r}$, is given by
+
+$$
+W_{r} = \frac{W - F_d + 2P}{S} + 1
+$$
+, where $P$ is the amount of zero padding applied to both sides of the input along the width dimension. The height of the convolution output is calculated similarly.
+
+Next, one loops over the batch, height and width dimensions of the output tensor and retrieves the corresponding elements of the input tensor that are multiplied with the kernel and summed to obtain the value of the convolution output at that location. The values of dilation and padding are accounted for when calculating the indices into the input during this step.
+
+The current implementation supports application of dilation to both the input tensor and the convolution kernel. However, the `dilation_input` parameter of the convolution function should be set to a value greater than 1 only when calling convolution from within the `convolution_backward` function.
+
+Similarly, one loops over all elements of the dilated convolution kernel and retrieves the values of weights that need to be multiplied with the corresponding elements of the input tensor. The dilation applied to the convolution kernel is also accounted for during this process.
+
+During the forward pass, no additional memory needs to be allocated to handle non-zero values of padding and dilation factors of either input tensor or convolution kernel which are greater than one.
+
+The backward pass proceeds largely as explained in the preceding two sections, except for two differences. First, the convolution operation used to calculate the gradients for the convolution input tensor uses the dilated convolution kernel. This involves modifying the values of padding and `dilation_kernel` parameters when calling the convolution function from within the `convolution_backward` function. The tensor returned by this function call will include gradients with respect to the padding elements. These elements are removed before returning the final result.
+
+Second, the convolution operation used to calculate the gradients for the convolution kernel uses the input tensor with padding applied. This involves modifying the value of padding when calling the convolution function from within the `convolution_backward` function. The tensor returned by this function call will include gradients for all elements of the dilated convolution kernel. The gradients for elements inserted during the dilation process which were not originally present in the convolution kernel are removed before returning the final result.
+
+
+The backward pass does allocate additional memory to store gradients with respect to the padding elments of the input tensors and elements of the dilated convolution kernel that were not present in the original kernel.
+
+## References
 
 - [Carnegie Mellon University Notes](https://deeplearning.cs.cmu.edu/F21/document/recitation/Recitation5/CNN_Backprop_Recitation_5_F21.pdf)
 - [Stanford CS231n lecture notes (html)](https://cs231n.github.io/convolutional-networks/)
