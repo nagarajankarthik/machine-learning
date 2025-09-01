@@ -47,7 +47,7 @@ vector<int> Tensor::broadcast_indices(vector<int> position, int offset) const {
         new_position[i] = 0;
       } else {
         logger->log(ERROR, " Invalid index in "
-                           "get_matrix at dimension " +
+                           "broadcast_indices at dimension " +
                                to_string(i) + ".");
         logger->log(ERROR, " Attempted to access index " +
                                to_string(new_position[i]) +
