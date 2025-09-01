@@ -1404,6 +1404,58 @@ inline shared_ptr<Tensor> convolution(shared_ptr<Tensor> input,
       add_tensor_forward(convolution_result, bias);
   return convolution_result_bias;
 }
+
+// Pooling operations
+
+inline void max_pool_backward(shared_ptr<Tensor> t3, int kernel_height,
+                              int kernel_width, int stride = 1, int padding = 0,
+                              int dilation_kernel = 1) {
+
+  shared_ptr<Tensor> t1 = t3->input_first;
+  if (!t1)
+    return;
+
+  vector<int> t1_shape = t1->shape;
+  vector<int> t3_shape = t3->shape;
+  int batch_size = t1_shape[0];
+  int channels = t1_shape[3];
+  int height_output = t3_shape[1];
+  int width_output = t3_shape[2];
+  int height_input = t1_shape[1];
+  int width_input = t1_shape[2];
+  int dilated_kernel_height = 1 + dilation_kernel * (kernel_height - 1);
+  int dilated_kernel_width = 1 + dilation_kernel * (kernel_width - 1);
+
+  for (int b = 0; b < batch_size; b++) {
+    for (int c = 0; c < channels; c++) {
+      for (int j = 0; j < height_output; j++) {
+        for (int i = 0; i < width_output; i++) {
+          double max_value = t3->get_element({b, j, i, c});
+          int row_start = j * stride;
+          int col_start = i * stride;
+          for (int l = row_start; l < row_start + dilated_kernel_height;
+               l += dilation_kernel) {
+            for (int k = col_start; k < col_start + dilated_kernel_width;
+                 k += dilation_kernel) {
+              if (k < padding || l < padding || k > padding + width_input - 1 ||
+                  l > padding + height_input - 1)
+                continue;
+              if (fabs(t1->get_element({b, l - padding, k - padding, c}) -
+                       max_value) < std::numeric_limits<double>::epsilon()) {
+                t1->set_element(vector<int>{b, l - padding, k - padding, c},
+                                t3->get_element({b, j, i, c}, "gradients"),
+                                "gradients");
+                goto end_loop;
+              }
+            }
+          }
+        end_loop : {}
+        }
+      }
+    }
+  }
+}
+
 /**
  * Function to perform maximum pooling operation
  * @param input: Tensor with shape (batch_size, height, width, channels)
@@ -1428,17 +1480,15 @@ inline shared_ptr<Tensor> max_pool(shared_ptr<Tensor> input, int kernel_height,
   int height_input = input->shape[1];
   int width_input = input->shape[2];
   int channels = input->shape[3];
-  int width_effective = width_input + 2 * padding;
-  int height_effective = height_input + 2 * padding;
   int dilated_kernel_height = 1 + dilation_kernel * (kernel_height - 1);
   int dilated_kernel_width = 1 + dilation_kernel * (kernel_width - 1);
-  int width_output = 1 + (width_effective - dilated_kernel_width) / stride;
-  int height_output = 1 + (height_effective - dilated_kernel_height) / stride;
+  int width_output =
+      1 + (width_input + 2 * padding - dilated_kernel_width) / stride;
+  int height_output =
+      1 + (height_input + 2 * padding - dilated_kernel_height) / stride;
 
-  vector<double> result_values(batch_size * height_output * width_output *
-                                   dilated_kernel_height *
-                                   dilated_kernel_width * channels,
-                               0.);
+  vector<double> result_values(
+      batch_size * height_output * width_output * channels, 0.);
   for (int b = 0; b < batch_size; b++) {
     for (int c = 0; c < channels; c++) {
       for (int j = 0; j < height_output; j++) {
@@ -1448,9 +1498,16 @@ inline shared_ptr<Tensor> max_pool(shared_ptr<Tensor> input, int kernel_height,
           int offset = b * height_output * width_output * channels +
                        j * width_output * channels + i * channels + c;
           double max_value = -std::numeric_limits<double>::infinity();
-          for (int l = row_start; l < row_start + dilated_kernel_height; l++) {
-            for (int k = col_start; k < col_start + dilated_kernel_width; k++) {
-              max_value = max(max_value, input->get_element({b, l, k, 0}));
+          for (int l = row_start; l < row_start + dilated_kernel_height;
+               l += dilation_kernel) {
+            for (int k = col_start; k < col_start + dilated_kernel_width;
+                 k += dilation_kernel) {
+              if (k < padding || l < padding || k > padding + width_input - 1 ||
+                  l > padding + height_input - 1)
+                continue;
+              max_value =
+                  max(max_value,
+                      input->get_element({b, l - padding, k - padding, c}));
             }
           }
           result_values[offset] = max_value;
@@ -1459,63 +1516,15 @@ inline shared_ptr<Tensor> max_pool(shared_ptr<Tensor> input, int kernel_height,
     }
   }
 
-  vector<int> data_shape{batch_size * height_output * width_output,
-                         dilated_kernel_height * dilated_kernel_width *
-                             channels};
-  return input;
+  vector<int> result_shape{batch_size, height_output, width_output, channels};
+  shared_ptr<Tensor> result =
+      make_shared<Tensor>(result_values, result_shape, logger, input, nullptr);
+  auto max_pool_back = [kernel_height, kernel_width, stride, padding,
+                        dilation_kernel](shared_ptr<Tensor> t3) {
+    max_pool_backward(t3, kernel_height, kernel_width, stride, padding,
+                      dilation_kernel);
+  };
+  result->backward_function = max_pool_back;
+  return result;
 }
-// shared_ptr<Tensor> data =
-//     make_shared<Tensor>(data_values, data_shape, logger);
-
-// vector<double> weights_values(number_filters * dilated_kernel_height *
-//                                   dilated_kernel_width * channels,
-//                               0.);
-// vector<int> weights_shape{
-//     dilated_kernel_height * dilated_kernel_width * channels,
-//     number_filters,
-// };
-
-// for (int j = 0; j < dilated_kernel_height; j++) {
-//   for (int i = 0; i < dilated_kernel_width; i++) {
-//     for (int c = 0; c < channels; c++) {
-//       for (int f = 0; f < number_filters; f++) {
-//         int offset = j * dilated_kernel_width * channels * number_filters +
-//                      i * channels * number_filters + c * number_filters +
-//                      f;
-//         if (j % dilation_kernel != 0 || i % dilation_kernel != 0)
-//           weights_values[offset] = 0;
-//         else {
-//           int j_ = j / dilation_kernel;
-//           int i_ = i / dilation_kernel;
-//           weights_values[offset] = kernel->get_element({f, j_, i_, c});
-//         }
-//       }
-//     }
-//   }
-// }
-
-// shared_ptr<Tensor> weights =
-//     make_shared<Tensor>(weights_values, weights_shape, logger);
-
-// // Define the following symbols:
-// // b: batch size
-// // h_r: height of convolution result
-// // w_r: width of convolution result
-// // nf: number of filters
-// // Shape of convolution_result: (b*h_r*w_r, nf)
-// shared_ptr<Tensor> convolution_result = batch_matmul_forward(data,
-// weights);
-
-// convolution_result->reshape(
-//     {batch_size, height_output, width_output, number_filters});
-// convolution_result->input_first = input;
-// convolution_result->input_second = kernel;
-// auto conv_back = [stride](shared_ptr<Tensor> t3) {
-//   convolution_backward(t3, stride);
-// };
-// convolution_result->backward_function = conv_back;
-// shared_ptr<Tensor> convolution_result_bias =
-//     add_tensor_forward(convolution_result, bias);
-// return convolution_result_bias;
-// }
 } // namespace ml
