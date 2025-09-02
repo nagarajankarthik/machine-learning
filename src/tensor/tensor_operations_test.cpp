@@ -951,3 +951,115 @@ TEST_F(TensorOpsTest, MaxPoolTest) {
     }
   }
 }
+
+TEST_F(TensorOpsTest, AveragePoolTest) {
+
+  // Create input tensor with shape (batch_size, height, width, channels)
+  vector<int> input_shape{2, 5, 5, 2};
+  int num_elements = 1;
+  for (int i = 0; i < input_shape.size(); i++) {
+    num_elements *= input_shape[i];
+  }
+  vector<double> input_values(num_elements, 1.);
+  shared_ptr<Tensor> input_tensor =
+      make_shared<Tensor>(input_values, input_shape, logger);
+
+  for (int j = 0; j < input_shape[1]; j++) {
+    for (int i = 0; i < input_shape[2]; i++) {
+      int index = j * input_shape[2] + i;
+      input_tensor->set_element(vector<int>{0, j, i, 0}, 1. * index);
+      input_tensor->set_element(vector<int>{0, j, i, 1}, 2. * index);
+      input_tensor->set_element(vector<int>{1, j, i, 0}, 3. * index);
+      input_tensor->set_element(vector<int>{1, j, i, 1}, 4. * index);
+    }
+  }
+
+  int kernel_height = 2;
+  int kernel_width = 2;
+  int stride = 2;
+  int padding = 1;
+  int dilation = 2;
+
+  int batch_size = input_tensor->shape[0];
+  int height_input = input_tensor->shape[1];
+  int width_input = input_tensor->shape[2];
+  int channels = input_tensor->shape[3];
+  int dilated_kernel_height = 1 + dilation * (kernel_height - 1);
+  int dilated_kernel_width = 1 + dilation * (kernel_width - 1);
+  int height_output =
+      1 + (height_input + 2 * padding - dilated_kernel_height) / stride;
+  int width_output =
+      1 + (width_input + 2 * padding - dilated_kernel_width) / stride;
+
+  shared_ptr<Tensor> pool_result = average_pool(
+      input_tensor, kernel_height, kernel_width, stride, padding, dilation);
+
+  for (int i = 0; i < pool_result->gradients.size(); i++) {
+    pool_result->gradients[i] = 1.;
+  }
+  pool_result->backward();
+
+  vector<int> expected_shape{batch_size, height_output, width_output, channels};
+  vector<int> result_shape = pool_result->shape;
+  ASSERT_EQ(result_shape.size(), expected_shape.size());
+  for (int i = 0; i < expected_shape.size(); i++) {
+    ASSERT_EQ(result_shape[i], expected_shape[i]);
+  }
+
+  int number_output_elements =
+      batch_size * height_output * width_output * channels;
+
+  vector<int> tmp{};
+  vector<vector<int>> average_indices(number_output_elements, tmp);
+
+  unordered_map<int, int> index_freq{};
+
+  for (int b = 0; b < batch_size; b++) {
+    for (int c = 0; c < channels; c++) {
+      for (int j = 0; j < input_shape[1] + padding; j += stride) {
+        for (int i = 0; i < input_shape[2] + padding; i += stride) {
+          double average_value = 0.;
+          vector<int> current_indices{};
+          for (int v = j; v < j + dilated_kernel_height; v += dilation) {
+            for (int u = i; u < i + dilated_kernel_width; u += dilation) {
+              if (v < padding || v >= height_input + padding || u < padding ||
+                  u >= width_input + padding)
+                continue;
+              int in_idx = b * (height_input * width_input * channels) +
+                           (v - padding) * (width_input * channels) +
+                           (u - padding) * channels + c;
+              current_indices.push_back(in_idx);
+              if (index_freq.find(in_idx) == index_freq.end())
+                index_freq[in_idx] = 1;
+              else
+                index_freq[in_idx]++;
+
+              double val = input_tensor->get_element(
+                  vector<int>{b, v - padding, u - padding, c}, "values");
+              average_value += val;
+            }
+          }
+          if (!current_indices.size()) {
+            throw runtime_error("Average pool failed to find a single value "
+                                "within the valid range of indices.");
+          }
+          int out_idx = b * (height_output * width_output * channels) +
+                        (j / stride) * (width_output * channels) +
+                        (i / stride) * channels + c;
+          average_indices[out_idx] = current_indices;
+          average_value /= current_indices.size();
+          ASSERT_FLOAT_EQ(pool_result->values[out_idx], average_value);
+        }
+      }
+    }
+  }
+  vector<double> expected_gradients(input_tensor->gradients.size(), 0.);
+  for (int i = 0; i < average_indices.size(); i++) {
+    for (int idx : average_indices[i]) {
+      expected_gradients[idx] += 1.0 / average_indices[i].size();
+    }
+  }
+  for (int i = 0; i < input_tensor->gradients.size(); i++) {
+    ASSERT_FLOAT_EQ(input_tensor->gradients[i], expected_gradients[i]);
+  }
+}
