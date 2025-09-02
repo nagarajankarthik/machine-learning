@@ -1527,4 +1527,133 @@ inline shared_ptr<Tensor> max_pool(shared_ptr<Tensor> input, int kernel_height,
   result->backward_function = max_pool_back;
   return result;
 }
+
+inline void average_pool_backward(shared_ptr<Tensor> t3, int kernel_height,
+                              int kernel_width, vector<int> count_values, int stride = 1, int padding = 0,
+                              int dilation_kernel = 1) {
+
+  shared_ptr<Tensor> t1 = t3->input_first;
+  if (!t1)
+    return;
+
+  if (t3->values.size() != count_values.size()) {
+    t1->logger->log(ERROR, "Size of count_values does not match size of tensor in average_pool_backward.");
+    exit(1);
+  }
+
+  vector<int> t1_shape = t1->shape;
+  vector<int> t3_shape = t3->shape;
+  int batch_size = t1_shape[0];
+  int channels = t1_shape[3];
+  int height_output = t3_shape[1];
+  int width_output = t3_shape[2];
+  int height_input = t1_shape[1];
+  int width_input = t1_shape[2];
+  int dilated_kernel_height = 1 + dilation_kernel * (kernel_height - 1);
+  int dilated_kernel_width = 1 + dilation_kernel * (kernel_width - 1);
+
+  for (int b = 0; b < batch_size; b++) {
+    for (int c = 0; c < channels; c++) {
+      for (int j = 0; j < height_output; j++) {
+        for (int i = 0; i < width_output; i++) {
+          int offset = b * height_output * width_output * channels +
+                       j * width_output * channels + i * channels + c;
+          int row_start = j * stride;
+          int col_start = i * stride;
+	  int number_average = 0;
+          for (int l = row_start; l < row_start + dilated_kernel_height;
+               l += dilation_kernel) {
+            for (int k = col_start; k < col_start + dilated_kernel_width;
+                 k += dilation_kernel) {
+              if (k < padding || l < padding || k > padding + width_input - 1 ||
+                  l > padding + height_input - 1)
+                continue;
+	      number_average = count_values[offset];
+	      t1->set_element(vector<int>{b, l - padding, k - padding, c},
+			      t3->get_element({b, j, i, c}, "gradients")/number_average,
+			      "gradients");
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Function to perform maximum pooling operation
+ * @param input: Tensor with shape (batch_size, height, width, channels)
+ * @param kernel_height: Height of the pooling kernel.
+ * @param kernel_width: Width of the pooling kernel.
+ * @param stride: Controls number of pixels to move between successive pooling
+ * operations.
+ * @param padding: Padding for the input tensor. All padding grid cells have
+ * value negative infinity.
+ * @param dilation_kernel: Dilation of the kernel.
+ * @return max_pool_result: Tensor with shape (batch_size, (height -
+ * kernel_height)/stride + 1, (width - kernel_width)/stride + 1,
+ * channels)
+ */
+inline shared_ptr<Tensor> average_pool(shared_ptr<Tensor> input, int kernel_height,
+                                   int kernel_width, int stride, int padding,
+                                   int dilation_kernel) {
+  shared_ptr<Logger> logger = input->logger;
+
+  // Update input to account for padding and dilation
+  int batch_size = input->shape[0];
+  int height_input = input->shape[1];
+  int width_input = input->shape[2];
+  int channels = input->shape[3];
+  int dilated_kernel_height = 1 + dilation_kernel * (kernel_height - 1);
+  int dilated_kernel_width = 1 + dilation_kernel * (kernel_width - 1);
+  int width_output =
+      1 + (width_input + 2 * padding - dilated_kernel_width) / stride;
+  int height_output =
+      1 + (height_input + 2 * padding - dilated_kernel_height) / stride;
+  
+
+  vector<double> result_values(
+      batch_size * height_output * width_output * channels, 0.);
+  vector<int> count_values(
+      batch_size * height_output * width_output * channels, 0);
+  for (int b = 0; b < batch_size; b++) {
+    for (int c = 0; c < channels; c++) {
+      for (int j = 0; j < height_output; j++) {
+        for (int i = 0; i < width_output; i++) {
+          int row_start = j * stride;
+          int col_start = i * stride;
+          int offset = b * height_output * width_output * channels +
+                       j * width_output * channels + i * channels + c;
+	    double average_value = 0.;
+	    int number_average = 0;
+          for (int l = row_start; l < row_start + dilated_kernel_height;
+               l += dilation_kernel) {
+            for (int k = col_start; k < col_start + dilated_kernel_width;
+                 k += dilation_kernel) {
+              if (k < padding || l < padding || k > padding + width_input - 1 ||
+                  l > padding + height_input - 1)
+                continue;
+                      average_value += input->get_element({b, l - padding, k - padding, c});
+		      number_average += 1;
+            }
+          }
+          result_values[offset] = average_value/number_average;
+	  count_values[offset] = number_average;
+        }
+      }
+    }
+  }
+
+  vector<int> result_shape{batch_size, height_output, width_output, channels};
+  shared_ptr<Tensor> result =
+      make_shared<Tensor>(result_values, result_shape, logger, input, nullptr);
+  auto average_pool_back = [kernel_height, kernel_width,count_values, stride, padding,
+                        dilation_kernel](shared_ptr<Tensor> t3) {
+    average_pool_backward(t3, kernel_height, kernel_width, count_values, stride, padding,
+                      dilation_kernel);
+  };
+  result->backward_function = average_pool_back;
+  return result;
+}
+
 } // namespace ml
