@@ -105,6 +105,38 @@ TEST_F(TensorOpsTest, MatmulBackwardTest) {
   }
 }
 
+TEST_F(TensorOpsTest, ElementwiseMultiplicationForwardTest) {
+  shared_ptr<Tensor> c = elementwise_product(a, b);
+  logger->log(INFO, "Created tensor c by multiplying a and b elementwise.");
+  vector<int> position{1};
+  vector<vector<double>> matrix = c->get_matrix(position, "values");
+  for (int i = 0; i < matrix.size(); i++) {
+    for (int j = 0; j < matrix[0].size(); j++) {
+      ASSERT_FLOAT_EQ(matrix[i][j], 1.);
+    }
+  }
+}
+
+TEST_F(TensorOpsTest, ElementwiseMultiplicationBackwardTest) {
+  shared_ptr<Tensor> c = elementwise_product(a, b);
+  vector<int> position{0};
+  fill(c->gradients.begin(), c->gradients.end(), 1.);
+  c->backward();
+
+  vector<vector<double>> grad = a->get_matrix(position, "gradients");
+  for (int i = 0; i < grad.size(); i++) {
+    for (int j = 0; j < grad[0].size(); j++) {
+      ASSERT_FLOAT_EQ(grad[i][j], 2.);
+    }
+  }
+
+  grad = b->get_matrix(position, "gradients");
+  for (int i = 0; i < grad.size(); i++) {
+    for (int j = 0; j < grad[0].size(); j++) {
+      ASSERT_FLOAT_EQ(grad[i][j], 1.);
+    }
+  }
+}
 // Perform concatenation on batch dimension
 TEST_F(TensorOpsTest, ConcatenateBatchForwardTest) {
   shared_ptr<Tensor> c = concatenate_forward(a, b, 0);
