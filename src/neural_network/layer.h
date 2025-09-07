@@ -26,14 +26,19 @@ public:
   int number_biases = 0;
 
   // Activation function
-  string activation = "sigmoid";
+  string activation = "linear";
 
   // Map of activation functions
   unordered_map<string, function<shared_ptr<Tensor>>> _activation_functions = {
       {"linear", [](shared_ptr<Tensor> x) { return x; }},
       {"relu", [](shared_ptr<Tensor> x) { return relu_forward(x); }},
       {"tanh", [](shared_ptr<Tensor> x) { return tanh_forward(x); }},
-      {"sigmoid", [](shared_ptr<Tensor> x) { return sigmoid_forward(x); }}};
+      {"sigmoid", [](shared_ptr<Tensor> x) { return sigmoid_forward(x); }},
+      {"softmax", [](shared_ptr<Tensor> x) { return softmax_forward(x); }},
+      {"leaky_relu",
+       [](shared_ptr<Tensor> x) { return leaky_relu_forward(x, 0.01); }}};
+
+  Layer() = default;
 
   Layer(int seed, int number_weights, int number_biases,
         vector<int> weights_shape, string init_method, string activation,
@@ -181,6 +186,116 @@ public:
     shared_ptr<Tensor> product_result = batch_matmul_forward(input, weights);
     shared_ptr<Tensor> linear_result = add_tensor_forward(product_result, bias);
     return _activation_functions[activation](linear_result);
+  }
+};
+
+class ConvolutionalLayer : public Layer {
+public:
+  // Kernel height
+  // Assuming square kernels, kernel_height == kernel_width
+  int kernel_height = 0;
+  // Kernel width
+  int kernel_width = 0;
+  // Number of input channels
+  int input_channels = 0;
+  // Number of output channels (or filters)
+  int output_channels = 0;
+  // Stride of the convolution
+  int stride = 1;
+  // Padding added to input
+  int padding = 0;
+  // Dilation of the kernel in convolution
+  int dilation_kernel = 1;
+
+  ConvolutionalLayer(int random_seed, int input_channels, int output_channels,
+                     int kernel_height, int kernel_width, int stride,
+                     int padding, int dilation_kernel, string init_method,
+                     string activation, shared_ptr<Logger> logger)
+      : Layer(random_seed,
+              input_channels * output_channels * kernel_height * kernel_width,
+              output_channels,
+              vector<int>{output_channels, kernel_height, kernel_width,
+                          input_channels},
+              init_method, activation, logger),
+        kernel_height(kernel_height), kernel_width(kernel_width),
+        input_channels(input_channels), output_channels(output_channels),
+        stride(stride), padding(padding), dilation_kernel(dilation_kernel) {
+    if (kernel_height <= 0 || kernel_width <= 0) {
+      throw invalid_argument("Kernel height and width must be positive");
+    }
+
+    if (kernel_height != kernel_width) {
+      throw invalid_argument(
+          "Only square kernels are currently supported. To relax this "
+          "constraint, the convolution function in tensor_operations.h needs "
+          "to be modified to allow the different values of padding in height "
+          "and width dimensions.");
+    }
+
+    if (input_channels <= 0) {
+      throw invalid_argument("Number of input channels must be positive");
+    }
+    if (output_channels <= 0) {
+      throw invalid_argument("Number of output channels must be positive");
+    }
+  }
+
+  /**
+   * Function to calculate outputs
+   * @param input: Input tensor to layer with shape (batch_size,
+   * height_input, width_input, input_channels)
+   * @return: Output tensor with shape (batch_size, height_output,
+   * width_output, output_channels)
+   */
+  shared_ptr<Tensor> forward(shared_ptr<Tensor> input) override {
+    return _activation_functions[activation](
+        convolution(input, weights, bias, stride, padding, 1, dilation_kernel));
+  }
+};
+
+class PoolingLayer : public Layer {
+public:
+  // Kernel height
+  int kernel_height = 0;
+  // Kernel width
+  int kernel_width = 0;
+  // Stride of the pooling operation
+  int stride = 1;
+  // Padding added to input. The values of padding grid cells are negative
+  // infinity and zero for max and average pooling respectively.
+  int padding = 0;
+  // Dilation of the kernel in pooling.
+  int dilation_kernel = 1;
+  // Type of pooling operation
+  string pooling_type = "max";
+
+  PoolingLayer(int kernel_height, int kernel_width, int stride, int padding,
+               int dilation_kernel, string pooling_type,
+               shared_ptr<Logger> logger)
+      : Layer(), kernel_height(kernel_height), kernel_width(kernel_width),
+        stride(stride), padding(padding), dilation_kernel(dilation_kernel),
+        pooling_type(pooling_type) {
+    if (kernel_height <= 0 || kernel_width <= 0) {
+      throw invalid_argument("Kernel height and width must be positive");
+    }
+  }
+
+  /**
+   * Function to calculate outputs
+   * @param input: Input tensor to layer with shape (batch_size,
+   * height_input, width_input, input_channels)
+   * @return: Output tensor with shape (batch_size, height_output,
+   * width_output, input_channels)
+   */
+  shared_ptr<Tensor> forward(shared_ptr<Tensor> input) override {
+    assert(input->shape.size() == 4);
+    if (pooling_type == "max") {
+      return max_pool(input, kernel_height, kernel_width, stride, padding,
+                      dilation_kernel);
+    } else if (pooling_type == "average") {
+      return average_pool(input, kernel_height, kernel_width, stride, padding,
+                          dilation_kernel);
+    }
   }
 };
 
