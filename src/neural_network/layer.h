@@ -299,4 +299,26 @@ public:
   }
 };
 
+class ReshapeLayer : public Layer {
+public:
+  // Target shape after reshaping
+  // The target shape should be compatible with the input shape.
+  vector<int> target_shape{};
+  ReshapeLayer(vector<int> target_shape, shared_ptr<Logger> logger)
+      : Layer(), target_shape(target_shape) {}
+
+  /**
+   * Function to calculate outputs
+   * @param input: Input tensor to layer with arbitrary shape
+   * @return: Output tensor whose shape matches target_shape
+   */
+  shared_ptr<Tensor> forward(shared_ptr<Tensor> input) override {
+    assert(input->values.size() == std::accumulate(target_shape.begin(),
+                                                   target_shape.end(), 1,
+                                                   std::multiplies<int>()));
+    input->reshape(target_shape);
+    return input;
+  }
+};
+
 } // namespace ml
