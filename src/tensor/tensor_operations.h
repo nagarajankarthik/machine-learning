@@ -393,6 +393,88 @@ inline shared_ptr<Tensor> batch_matmul_forward(shared_ptr<Tensor> t1,
   return t3;
 }
 
+inline void recurse_multiply_tensor_backward(shared_ptr<Tensor> t3,
+                                             shared_ptr<Tensor> t1,
+                                             shared_ptr<Tensor> t2,
+                                             vector<int> &new_position,
+                                             int axis = 0) {
+
+  if (axis == t3->shape.size()) {
+    double g3 = t3->get_element(new_position, "gradients");
+    double v1 = t1->get_element(new_position);
+    double v2 = t2->get_element(new_position);
+    t1->set_element(new_position, g3 * v2, "gradients");
+    t2->set_element(new_position, g3 * v1, "gradients");
+    return;
+  }
+
+  new_position.push_back(0);
+  int position_index = new_position.size() - 1;
+
+  for (int i = 0; i < t3->shape[axis]; i++) {
+    new_position[position_index] = i;
+    recurse_multiply_tensor_backward(t3, t1, t2, new_position, axis + 1);
+  }
+  new_position.pop_back();
+}
+
+inline void elementwise_product_backward(shared_ptr<Tensor> t3) {
+
+  shared_ptr<Tensor> t1 = t3->input_first;
+  if (!t1)
+    return;
+  shared_ptr<Tensor> t2 = t3->input_second;
+
+  shared_ptr<Logger> logger = t1->logger;
+
+  vector<int> new_position{};
+  recurse_multiply_tensor_backward(t3, t1, t2, new_position);
+}
+
+inline void recurse_multiply_tensor_forward(shared_ptr<Tensor> t3,
+                                            const shared_ptr<Tensor> t1,
+                                            const shared_ptr<Tensor> t2,
+                                            vector<int> &new_position,
+                                            int axis = 0) {
+
+  if (axis == t3->shape.size()) {
+    double v1 = t1->get_element(new_position);
+    double v2 = t2->get_element(new_position);
+    t3->set_element(new_position, v1 * v2);
+    return;
+  }
+
+  new_position.push_back(0);
+  int position_index = new_position.size() - 1;
+
+  for (int i = 0; i < t3->shape[axis]; i++) {
+    new_position[position_index] = i;
+    recurse_multiply_tensor_forward(t3, t1, t2, new_position, axis + 1);
+  }
+  new_position.pop_back();
+}
+
+inline shared_ptr<Tensor> elementwise_product(shared_ptr<Tensor> t1,
+                                              shared_ptr<Tensor> t2) {
+  shared_ptr<Logger> logger = t1->logger;
+  vector<int> new_shape = broadcast_shape(t1->shape, t2->shape, logger, 0);
+  int new_size = 1;
+  for (int i = 0; i < new_shape.size(); i++) {
+    new_size *= new_shape[i];
+  }
+
+  function<void(shared_ptr<Tensor>)> elementwise_product_back =
+      elementwise_product_backward;
+
+  shared_ptr<Tensor> t3 =
+      make_shared<Tensor>(vector<double>(new_size, 0.), new_shape, logger, t1,
+                          t2, elementwise_product_back);
+
+  vector<int> new_position{};
+  recurse_multiply_tensor_forward(t3, t1, t2, new_position);
+  return t3;
+}
+
 inline void recurse_concatenate_backward(const shared_ptr<Tensor> t3,
                                          shared_ptr<Tensor> t1,
                                          shared_ptr<Tensor> t2,
