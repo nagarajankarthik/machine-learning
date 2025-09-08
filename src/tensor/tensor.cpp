@@ -97,19 +97,50 @@ void Tensor::swap_elements(vector<int> position_first,
   swap(values[index_first], values[index_second]);
 }
 
-void Tensor::get_subtensor(vector<vector<int>> new_shape, int axis, int offset,
-                           vector<double> &new_values) {
+void Tensor::get_subtensor_indices(vector<vector<int>> new_shape,
+                                   vector<int> &indices, int axis, int offset) {
 
   int start = new_shape[axis][0];
   int end = new_shape[axis][1];
   if (axis == new_shape.size() - 1) {
     for (int i = start; i <= end; i++) {
-      new_values.push_back(this->values[offset + i]);
+      indices.push_back(offset + i);
     }
   } else {
     for (int i = start; i <= end; i++) {
-      get_subtensor(new_shape, axis + 1, offset + i * strides[axis],
-                    new_values);
+      get_subtensor_indices(new_shape, indices, axis + 1,
+                            offset + i * strides[axis]);
+    }
+  }
+}
+void Tensor::get_subtensor(vector<vector<int>> new_shape,
+                           vector<double> &new_values, string item) {
+
+  vector<int> indices;
+  get_subtensor_indices(new_shape, indices);
+  if (item == "values") {
+    for (int i = 0; i < indices.size(); i++) {
+      new_values.push_back(this->values[indices[i]]);
+    }
+  } else {
+    for (int i = 0; i < indices.size(); i++) {
+      new_values.push_back(this->gradients[indices[i]]);
+    }
+  }
+}
+
+void Tensor::set_subtensor(vector<vector<int>> new_shape,
+                           const vector<double> &new_values, string item) {
+
+  vector<int> indices;
+  get_subtensor_indices(new_shape, indices);
+  if (item == "values") {
+    for (int i = 0; i < indices.size(); i++) {
+      this->values[indices[i]] = new_values[i];
+    }
+  } else {
+    for (int i = 0; i < indices.size(); i++) {
+      this->gradients[indices[i]] = new_values[i];
     }
   }
 }
