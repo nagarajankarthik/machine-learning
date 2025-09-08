@@ -91,10 +91,23 @@ public:
   void swap_elements(vector<int> position_first, vector<int> position_second);
 
   /**
+   * Extract indices corresponding to subset of values from tensor using range
+   */
+  void get_subtensor_indices(vector<vector<int>> new_shape,
+                             vector<int> &indices, int axis = 0,
+                             int offset = 0);
+
+  /**
    * Extract subset of values from tensor using range indexing
    */
-  void get_subtensor(vector<vector<int>> new_shape, int axis, int offset,
-                     vector<double> &new_values);
+  void get_subtensor(vector<vector<int>> new_shape, vector<double> &new_values,
+                     string item = "values");
+
+  /**
+   * Modify subset of values from tensor using range indexing
+   */
+  void set_subtensor(vector<vector<int>> new_shape,
+                     const vector<double> &new_values, string item = "values");
 
   /**
    * Function to retrieve matrix based on specified indices into
