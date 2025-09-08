@@ -1,5 +1,6 @@
 #include "tensor.h"
 #include <math.h>
+#include <numeric>
 using namespace std;
 
 namespace ml {
@@ -472,6 +473,52 @@ inline shared_ptr<Tensor> elementwise_product(shared_ptr<Tensor> t1,
 
   vector<int> new_position{};
   recurse_multiply_tensor_forward(t3, t1, t2, new_position);
+  return t3;
+}
+
+inline shared_ptr<Tensor> axis_norm_forward(shared_ptr<Tensor> t1,
+                                            int axis = 0) {
+  shared_ptr<Logger> logger = t1->logger;
+  vector<int> tmp{0, 0};
+  vector<vector<int>> new_shape(t1->shape.size(), tmp);
+  for (int i = 0; i < t1->shape.size(); i++) {
+    new_shape[i] = {0, t1->shape[i] - 1};
+  }
+  shared_ptr<Tensor> t3 =
+      make_shared<Tensor>(t1->values, t1->shape, t1->logger);
+  vector<double> averages(t1->shape[axis], 0.);
+  vector<double> variances(t1->shape[axis], 0.);
+  for (int i = 0; i < t1->shape[axis]; i++) {
+    new_shape[axis] = {i, i};
+    vector<int> subtensor_indices{};
+    t1->get_subtensor_indices(new_shape, subtensor_indices);
+    vector<double> subtensor_values(subtensor_indices.size());
+    for (int j = 0; j < subtensor_indices.size(); j++) {
+      subtensor_values[j] = t1->values.at(subtensor_indices[j]);
+    }
+    double current_mean =
+        accumulate(subtensor_values.begin(), subtensor_values.end(), 0.0) /
+        subtensor_values.size();
+    std::vector<double> differences(subtensor_values.size());
+    std::transform(subtensor_values.begin(), subtensor_values.end(),
+                   differences.begin(),
+                   [current_mean](double x) { return x - current_mean; });
+
+    double current_variance =
+        inner_product(differences.begin(), differences.end(),
+                      differences.begin(), 0.0) /
+        subtensor_values.size();
+    averages[i] = current_mean;
+    variances[i] = current_variance;
+    double epsilon_offset = 1.0e-5;
+    std::transform(differences.begin(), differences.end(), differences.begin(),
+                   [current_variance, epsilon_offset](double x) {
+                     return x / sqrt(current_variance + epsilon_offset);
+                   });
+    for (int j = 0; j < differences.size(); j++) {
+      t3->values.at(subtensor_indices[j]) = differences[j];
+    }
+  }
   return t3;
 }
 
@@ -1175,7 +1222,8 @@ inline shared_ptr<Tensor> convolution(shared_ptr<Tensor> input,
                                       int dilation_kernel = 1);
 /**
  * Function to perform backward pass of convolution operation.
- * It is assumed that the value of dilation_input used in the forward pass is 1.
+ * It is assumed that the value of dilation_input used in the forward pass
+ * is 1.
  * @param convolution_result: Tensor with shape (batch_size,
  * height_output, width_output, num_filters).
  * @param stride: Stride of the convolution for forward pass.
@@ -1226,7 +1274,7 @@ inline void convolution_backward(shared_ptr<Tensor> convolution_result,
       kernel_index[3][0] = c;
       kernel_index[3][1] = c;
       vector<double> kernel_values{};
-      convolution_kernel->get_subtensor(kernel_index, 0, 0, kernel_values);
+      convolution_kernel->get_subtensor(kernel_index, kernel_values);
 
       shared_ptr<Tensor> kernel_tensor =
           make_shared<Tensor>(kernel_values,
@@ -1240,7 +1288,7 @@ inline void convolution_backward(shared_ptr<Tensor> convolution_result,
       gradient_index[3][0] = f;
       gradient_index[3][1] = f;
       vector<double> gradient_values{};
-      gradient_tensor->get_subtensor(gradient_index, 0, 0, gradient_values);
+      gradient_tensor->get_subtensor(gradient_index, gradient_values);
       shared_ptr<Tensor> gradient_subtensor =
           make_shared<Tensor>(gradient_values,
                               vector<int>{convolution_result->shape[0],
@@ -1281,7 +1329,7 @@ inline void convolution_backward(shared_ptr<Tensor> convolution_result,
         gradient_index[3][0] = f;
         gradient_index[3][1] = f;
         vector<double> gradient_values{};
-        gradient_tensor->get_subtensor(gradient_index, 0, 0, gradient_values);
+        gradient_tensor->get_subtensor(gradient_index, gradient_values);
         shared_ptr<Tensor> gradient_subtensor =
             make_shared<Tensor>(gradient_values,
                                 vector<int>{1, gradient_tensor->shape[1],
@@ -1296,7 +1344,7 @@ inline void convolution_backward(shared_ptr<Tensor> convolution_result,
         convolution_input_index[3][1] = c;
 
         vector<double> convolution_input_values{};
-        convolution_input->get_subtensor(convolution_input_index, 0, 0,
+        convolution_input->get_subtensor(convolution_input_index,
                                          convolution_input_values);
         shared_ptr<Tensor> convolution_input_subtensor =
             make_shared<Tensor>(convolution_input_values,
@@ -1379,8 +1427,8 @@ get_values_at_index(int batch, int width_start, int height_start,
  * @param bias: Tensor with shape (1, number_filters). Bias to be added
  * to result of convolution.
  * @param stride: Stride of the convolution.
- * @param padding: Padding of the convolution. All padding grid cells have value
- * 0.
+ * @param padding: Padding of the convolution. All padding grid cells have
+ * value 0.
  * @param dilation: Dilation of the convolution.
  * @return conv_result: Tensor with shape (batch_size, (height -
  * kernel_height)/stride + 1, (width - kernel_width)/stride + 1,
