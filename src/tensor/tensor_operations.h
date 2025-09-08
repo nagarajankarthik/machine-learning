@@ -1,4 +1,5 @@
 #include "tensor.h"
+#include <cassert>
 #include <math.h>
 #include <numeric>
 using namespace std;
@@ -476,6 +477,68 @@ inline shared_ptr<Tensor> elementwise_product(shared_ptr<Tensor> t1,
   return t3;
 }
 
+inline void axis_norm_backward(shared_ptr<Tensor> t3, int axis,
+                               vector<double> averages,
+                               vector<double> variances,
+                               double epsilon_offset) {
+
+  shared_ptr<Tensor> t1 = t3->input_first;
+  shared_ptr<Logger> logger = t1->logger;
+  if (!t1)
+    return;
+  assert(t1->shape.size() == t3->shape.size() &&
+         "Error in axis_norm_backward. Input and output tensors must have the "
+         "same number of dimensions.");
+  if (t1->shape[axis] != averages.size()) {
+    logger->log(ERROR, "Error in axis_norm_backward. The tensor t1 has " +
+                           to_string(t1->shape[axis]) +
+                           " elements along axis " + to_string(axis) +
+                           " but the vector averages has " +
+                           to_string(averages.size()) + " elements.");
+    exit(1);
+  }
+  if (t1->shape[axis] != variances.size()) {
+    logger->log(ERROR, "Error in axis_norm_backward. The tensor t1 has " +
+                           to_string(t1->shape[axis]) +
+                           " elements along axis " + to_string(axis) +
+                           " but the vector averages has " +
+                           to_string(averages.size()) + " elements.");
+    exit(1);
+  }
+
+  vector<int> tmp{0, 0};
+  vector<vector<int>> new_shape(t1->shape.size(), tmp);
+  for (int i = 0; i < t1->shape.size(); i++) {
+    new_shape[i] = {0, t1->shape[i] - 1};
+  }
+
+  for (int i = 0; i < t1->shape[axis]; i++) {
+    new_shape[axis] = {i, i};
+    vector<int> subtensor_indices{};
+    t1->get_subtensor_indices(new_shape, subtensor_indices);
+    int batch_size = subtensor_indices.size();
+    vector<double> t3_gradients(subtensor_indices.size(), 0.);
+    double current_average = averages[i];
+    double current_variance = variances[i];
+    double sqrt_sig2_eps = sqrt(current_variance + epsilon_offset);
+    double sum_gradients = 0.;
+    double inner_product_grad_diff = 0.;
+    for (int index : subtensor_indices) {
+      sum_gradients += t3->gradients[index];
+      inner_product_grad_diff +=
+          t3->gradients[index] * (t1->values[index] - current_average);
+    }
+    for (int index : subtensor_indices) {
+      double current_diff = t1->values[index] - current_average;
+      t1->gradients[index] =
+          t3->gradients[index] / sqrt_sig2_eps -
+          sum_gradients / (batch_size * sqrt_sig2_eps) -
+          current_diff * inner_product_grad_diff /
+              (batch_size * sqrt_sig2_eps * sqrt_sig2_eps * sqrt_sig2_eps);
+    }
+  }
+}
+
 inline shared_ptr<Tensor> axis_norm_forward(shared_ptr<Tensor> t1,
                                             int axis = 0) {
   shared_ptr<Logger> logger = t1->logger;
@@ -488,6 +551,7 @@ inline shared_ptr<Tensor> axis_norm_forward(shared_ptr<Tensor> t1,
       make_shared<Tensor>(t1->values, t1->shape, t1->logger);
   vector<double> averages(t1->shape[axis], 0.);
   vector<double> variances(t1->shape[axis], 0.);
+  double epsilon_offset = 1.0e-5;
   for (int i = 0; i < t1->shape[axis]; i++) {
     new_shape[axis] = {i, i};
     vector<int> subtensor_indices{};
@@ -510,7 +574,6 @@ inline shared_ptr<Tensor> axis_norm_forward(shared_ptr<Tensor> t1,
         subtensor_values.size();
     averages[i] = current_mean;
     variances[i] = current_variance;
-    double epsilon_offset = 1.0e-5;
     std::transform(differences.begin(), differences.end(), differences.begin(),
                    [current_variance, epsilon_offset](double x) {
                      return x / sqrt(current_variance + epsilon_offset);
@@ -519,6 +582,11 @@ inline shared_ptr<Tensor> axis_norm_forward(shared_ptr<Tensor> t1,
       t3->values.at(subtensor_indices[j]) = differences[j];
     }
   }
+  auto axis_norm_back = [axis, averages, variances,
+                         epsilon_offset](shared_ptr<Tensor> t3) {
+    axis_norm_backward(t3, axis, averages, variances, epsilon_offset);
+  };
+  t3->backward_function = axis_norm_back;
   return t3;
 }
 
