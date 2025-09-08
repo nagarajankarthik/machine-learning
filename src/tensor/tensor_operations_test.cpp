@@ -137,6 +137,50 @@ TEST_F(TensorOpsTest, ElementwiseMultiplicationBackwardTest) {
     }
   }
 }
+
+TEST_F(TensorOpsTest, AxisNormForwardTest) {
+  shared_ptr<Tensor> c = axis_norm_forward(b, 2);
+  logger->log(INFO, "Created tensor c by normalizing a.");
+  vector<int> position{0};
+  vector<vector<double>> matrix = c->get_matrix(position, "values");
+  for (int i = 0; i < matrix.size(); i++) {
+    for (int j = 0; j < matrix[0].size(); j++) {
+      ASSERT_FLOAT_EQ(matrix[i][j], 0.);
+    }
+  }
+  // Create input tensor with shape (batch_size, height, width, channels)
+  vector<int> input_shape{2, 4, 4, 2};
+  int num_elements = 1;
+  for (int i = 0; i < input_shape.size(); i++) {
+    num_elements *= input_shape[i];
+  }
+  vector<double> input_values(num_elements, 1.);
+  shared_ptr<Tensor> input_tensor =
+      make_shared<Tensor>(input_values, input_shape, logger);
+
+  for (int j = 0; j < input_shape[1]; j++) {
+    for (int i = 0; i < input_shape[2]; i++) {
+      input_tensor->set_element(vector<int>{0, j, i, 0}, 1.);
+      input_tensor->set_element(vector<int>{0, j, i, 1}, 2.);
+      input_tensor->set_element(vector<int>{1, j, i, 0}, 3.);
+      input_tensor->set_element(vector<int>{1, j, i, 1}, 4.);
+    }
+  }
+
+  shared_ptr<Tensor> input_norm = axis_norm_forward(input_tensor, 3);
+
+  for (int j = 0; j < input_shape[1]; j++) {
+    for (int i = 0; i < input_shape[2]; i++) {
+      ASSERT_NEAR(input_norm->get_element(vector<int>{0, j, i, 0}), -1.,
+                  1.0e-5);
+      ASSERT_NEAR(input_norm->get_element(vector<int>{0, j, i, 1}), -1.,
+                  1.0e-5);
+      ASSERT_NEAR(input_norm->get_element(vector<int>{1, j, i, 0}), 1., 1.0e-5);
+      ASSERT_NEAR(input_norm->get_element(vector<int>{1, j, i, 1}), 1., 1.0e-5);
+    }
+  }
+}
+
 // Perform concatenation on batch dimension
 TEST_F(TensorOpsTest, ConcatenateBatchForwardTest) {
   shared_ptr<Tensor> c = concatenate_forward(a, b, 0);
