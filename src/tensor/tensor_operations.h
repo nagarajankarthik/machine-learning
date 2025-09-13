@@ -586,6 +586,7 @@ inline shared_ptr<Tensor> axis_norm_forward(shared_ptr<Tensor> t1,
                          epsilon_offset](shared_ptr<Tensor> t3) {
     axis_norm_backward(t3, axis, averages, variances, epsilon_offset);
   };
+  t3->input_first = t1;
   t3->backward_function = axis_norm_back;
   return t3;
 }
