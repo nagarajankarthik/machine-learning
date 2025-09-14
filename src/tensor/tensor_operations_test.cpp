@@ -139,7 +139,15 @@ TEST_F(TensorOpsTest, ElementwiseMultiplicationBackwardTest) {
 }
 
 TEST_F(TensorOpsTest, AxisNormForwardTest) {
-  shared_ptr<Tensor> c = axis_norm_forward(b, 2);
+  vector<double> normalization_parameters_values(2 * b->shape[2], 0.);
+  fill(normalization_parameters_values.begin(),
+       normalization_parameters_values.begin() + b->shape[2], 1.);
+  shared_ptr<Tensor> normalization_parameters = make_shared<Tensor>(
+      normalization_parameters_values, vector<int>{2, b->shape[2]}, logger);
+  vector<double> averages(b->shape[2], 0.);
+  vector<double> variances(b->shape[2], 0.);
+  shared_ptr<Tensor> c = axis_norm_forward(b, 2, normalization_parameters,
+                                           averages, variances, true);
   vector<int> position{0};
   vector<vector<double>> matrix = c->get_matrix(position, "values");
   for (int i = 0; i < matrix.size(); i++) {
@@ -166,7 +174,19 @@ TEST_F(TensorOpsTest, AxisNormForwardTest) {
     }
   }
 
-  shared_ptr<Tensor> input_norm = axis_norm_forward(input_tensor, 3);
+  averages.resize(input_shape[3]);
+  variances.resize(input_shape[3]);
+  fill(averages.begin(), averages.end(), 0.);
+  fill(variances.begin(), variances.end(), 0.);
+
+  normalization_parameters_values.resize(2 * input_shape[3], 0.);
+  fill(normalization_parameters_values.begin(),
+       normalization_parameters_values.begin() + input_shape[3], 1.);
+  normalization_parameters = make_shared<Tensor>(
+      normalization_parameters_values, vector<int>{2, input_shape[3]}, logger);
+
+  shared_ptr<Tensor> input_norm = axis_norm_forward(
+      input_tensor, 3, normalization_parameters, averages, variances, true);
 
   for (int j = 0; j < input_shape[1]; j++) {
     for (int i = 0; i < input_shape[2]; i++) {
@@ -181,7 +201,15 @@ TEST_F(TensorOpsTest, AxisNormForwardTest) {
 }
 
 TEST_F(TensorOpsTest, AxisNormBackwardTest) {
-  shared_ptr<Tensor> c = axis_norm_forward(b, 2);
+  vector<double> normalization_parameters_values(2 * b->shape[2], 0.);
+  fill(normalization_parameters_values.begin(),
+       normalization_parameters_values.begin() + b->shape[2], 1.);
+  shared_ptr<Tensor> normalization_parameters = make_shared<Tensor>(
+      normalization_parameters_values, vector<int>{2, b->shape[2]}, logger);
+  vector<double> averages(b->shape[2], 0.);
+  vector<double> variances(b->shape[2], 0.);
+  shared_ptr<Tensor> c = axis_norm_forward(b, 2, normalization_parameters,
+                                           averages, variances, true);
   fill(c->gradients.begin(), c->gradients.end(), 1.);
   c->backward();
   for (int i = 0; i < b->gradients.size(); i++) {
@@ -206,7 +234,21 @@ TEST_F(TensorOpsTest, AxisNormBackwardTest) {
     }
   }
 
-  shared_ptr<Tensor> input_norm = axis_norm_forward(input_tensor, 3);
+  averages.resize(input_shape[3]);
+  variances.resize(input_shape[3]);
+  fill(averages.begin(), averages.end(), 0.);
+  fill(variances.begin(), variances.end(), 0.);
+
+  double gamma = 4.;
+  double beta = 0.;
+
+  normalization_parameters_values.resize(2 * input_shape[3], beta);
+  fill(normalization_parameters_values.begin(),
+       normalization_parameters_values.begin() + input_shape[3], gamma);
+  normalization_parameters = make_shared<Tensor>(
+      normalization_parameters_values, vector<int>{2, input_shape[3]}, logger);
+  shared_ptr<Tensor> input_norm = axis_norm_forward(
+      input_tensor, 3, normalization_parameters, averages, variances, true);
 
   fill(input_norm->gradients.begin(), input_norm->gradients.end(), 1.);
   input_norm->backward();
@@ -223,16 +265,22 @@ TEST_F(TensorOpsTest, AxisNormBackwardTest) {
     }
   }
 
-  for (int j = 0; j < input_shape[1]; j++) {
-    for (int i = 0; i < input_shape[2]; i++) {
-      input_norm->set_element(vector<int>{0, j, i, 0}, i % 2 ? 1. : 3.,
-                              "gradients");
-      input_norm->set_element(vector<int>{0, j, i, 1}, i % 2 ? 2. : 4.,
-                              "gradients");
-      input_norm->set_element(vector<int>{1, j, i, 0}, i % 2 ? 1. : 3.,
-                              "gradients");
-      input_norm->set_element(vector<int>{1, j, i, 1}, i % 2 ? 2. : 4.,
-                              "gradients");
+  // Zero gradients
+  input_norm->zero_gradients();
+
+  vector<double> channel_gradients(input_shape[3], 0.);
+  for (int b = 0; b < input_shape[0]; b++) {
+    for (int j = 0; j < input_shape[1]; j++) {
+      for (int i = 0; i < input_shape[2]; i++) {
+        for (int c = 0; c < input_shape[3]; c++) {
+          double lower = 1. * c + 1.;
+          double upper = lower + 2.;
+          double current_gradient = i % 2 ? lower : upper;
+          input_norm->set_element(vector<int>{b, j, i, c}, current_gradient,
+                                  "gradients");
+          channel_gradients[c] += current_gradient;
+        }
+      }
     }
   }
 
@@ -244,10 +292,19 @@ TEST_F(TensorOpsTest, AxisNormBackwardTest) {
         for (int c = 0; c < input_shape[3]; c++) {
           double current_gradient =
               input_tensor->get_element(vector<int>{b, j, i, c}, "gradients");
-          ASSERT_NEAR(current_gradient, i % 2 ? -1. : 1., 1.0e-5);
+          ASSERT_NEAR(current_gradient, i % 2 ? -1. * gamma : 1. * gamma,
+                      1.0e-4);
         }
       }
     }
+  }
+
+  for (int i = 0; i < input_shape[3]; i++) {
+    ASSERT_FLOAT_EQ(averages[i], 1. * (i + 2));
+    ASSERT_FLOAT_EQ(variances[i], 1.);
+    ASSERT_NEAR(normalization_parameters->gradients[i], 0., 1.0e-5);
+    ASSERT_FLOAT_EQ(normalization_parameters->gradients[input_shape[3] + i],
+                    channel_gradients[i]);
   }
 }
 
