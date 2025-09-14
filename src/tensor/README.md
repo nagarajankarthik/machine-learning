@@ -40,10 +40,27 @@ $$
 $$
 \sigma^2 = \frac{1}{m} \sum_{i = 1}^{m} (x_i - \mu)^2
 $$
-, where $x_i$ is the element at index $i$ of the current subset, $m$ is the number of elements, and $\mu$ and $\sigma$ denote the mean and standard deviation of the subset respectively.
+
+$$
+z_i = \gamma y_i + \beta
+$$
+
+, where $x_i$ is the element at index $i$ of the current subset, $m$ is the number of elements, and $\mu$ and $\sigma$ denote the mean and standard deviation of the subset respectively. Also, $\gamma$ and $\beta$ are learnable parameters. The overall effect of this operation is to map each element $y_i$ to the corresponding output $z_i$.
 
 Back-propagation:
 
+
+$$
+\frac{\partial L}{\partial \beta} = \sum_{i = 1}^m \frac{\partial L}{\partial z_i} \frac{\partial z_i}{\partial \beta} = \sum_{i = 1}^m \frac{\partial L}{\partial z_i}
+$$
+
+$$
+\frac{\partial L}{\partial \gamma} = \sum_{i = 1}^m \frac{\partial L}{\partial z_i} \frac{\partial z_i}{\partial \gamma} = \sum_{i = 1}^m y_i \frac{\partial L}{\partial z_i}
+$$
+
+$$
+\frac{\partial L}{\partial y_i} = \frac{\partial L}{\partial z_i} \frac{\partial z_i}{\partial y_i} = \gamma \frac{\partial L}{\partial z_i}
+$$
 
 $$
 \frac{\partial \mu}{\partial x_j} = \frac{1}{m}
