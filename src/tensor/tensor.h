@@ -135,6 +135,12 @@ public:
    */
   void backward();
 
+  /**
+   * Set all gradients of current Tensor object and its predecessors in the
+   * computational graph to zero
+   */
+  void zero_gradients();
+
 private:
   /**
    * Used to support multi-dimensional indexing

@@ -260,4 +260,14 @@ void Tensor::backward() {
     input_second->backward();
 }
 
+void Tensor::zero_gradients() {
+  for (int i = 0; i < gradients.size(); i++) {
+    gradients[i] = 0;
+  }
+  if (input_first)
+    input_first->zero_gradients();
+  if (input_second)
+    input_second->zero_gradients();
+}
+
 } // namespace ml
