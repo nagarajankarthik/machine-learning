@@ -546,9 +546,9 @@ inline void axis_norm_backward(shared_ptr<Tensor> t3, int axis,
       }
       double affine_input = (t3->values[index] - beta) / gamma;
       normalization_parameters->set_element(
-          {0, i}, affine_input * t3->gradients[index], "gradients");
-      normalization_parameters->set_element({1, i}, t3->gradients[index],
-                                            "gradients");
+          vector<int>{0, i}, affine_input * t3->gradients[index], "gradients");
+      normalization_parameters->set_element(vector<int>{1, i},
+                                            t3->gradients[index], "gradients");
       sum_gradients += gamma * t3->gradients[index];
       inner_product_grad_diff +=
           gamma * t3->gradients[index] * (t1->values[index] - current_average);
