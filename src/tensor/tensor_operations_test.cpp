@@ -275,8 +275,6 @@ TEST_F(TensorOpsTest, AxisNormBackwardTest) {
 
   // Zero gradients
   input_norm->zero_gradients();
-  // fill(weights->gradients.begin(), weights->gradients.end(), 0.);
-  // fill(bias->gradients.begin(), bias->gradients.end(), 0.);
 
   vector<double> channel_gradients(input_shape[3], 0.);
   for (int b = 0; b < input_shape[0]; b++) {
