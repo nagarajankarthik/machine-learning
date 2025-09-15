@@ -30,6 +30,14 @@ public:
       : optimize_parameters(optimize_parameters), logger(logger) {}
 
   virtual void step() = 0;
+
+  virtual ~Optimizer() {}
+
+  void zero_gradients() {
+    for (shared_ptr<Tensor> parameter : optimize_parameters) {
+      fill(parameter->gradients.begin(), parameter->gradients.end(), 0.0);
+    }
+  }
 };
 
 /**
