@@ -139,15 +139,17 @@ TEST_F(TensorOpsTest, ElementwiseMultiplicationBackwardTest) {
 }
 
 TEST_F(TensorOpsTest, AxisNormForwardTest) {
-  vector<double> normalization_parameters_values(2 * b->shape[2], 0.);
-  fill(normalization_parameters_values.begin(),
-       normalization_parameters_values.begin() + b->shape[2], 1.);
-  shared_ptr<Tensor> normalization_parameters = make_shared<Tensor>(
-      normalization_parameters_values, vector<int>{2, b->shape[2]}, logger);
+  vector<double> weights_values(b->shape[2], 1.);
+  vector<double> bias_values(b->shape[2], 0.);
+  vector<int> weights_bias_shape{1, b->shape[2]};
+  shared_ptr<Tensor> weights =
+      make_shared<Tensor>(weights_values, weights_bias_shape, logger);
+  shared_ptr<Tensor> bias =
+      make_shared<Tensor>(bias_values, weights_bias_shape, logger);
   vector<double> averages(b->shape[2], 0.);
   vector<double> variances(b->shape[2], 0.);
-  shared_ptr<Tensor> c = axis_norm_forward(b, 2, normalization_parameters,
-                                           averages, variances, true);
+  shared_ptr<Tensor> c =
+      axis_norm_forward(b, 2, weights, bias, averages, variances, true);
   vector<int> position{0};
   vector<vector<double>> matrix = c->get_matrix(position, "values");
   for (int i = 0; i < matrix.size(); i++) {
@@ -179,14 +181,16 @@ TEST_F(TensorOpsTest, AxisNormForwardTest) {
   fill(averages.begin(), averages.end(), 0.);
   fill(variances.begin(), variances.end(), 0.);
 
-  normalization_parameters_values.resize(2 * input_shape[3], 0.);
-  fill(normalization_parameters_values.begin(),
-       normalization_parameters_values.begin() + input_shape[3], 1.);
-  normalization_parameters = make_shared<Tensor>(
-      normalization_parameters_values, vector<int>{2, input_shape[3]}, logger);
+  weights_values.resize(input_shape[3]);
+  fill(weights_values.begin(), weights_values.end(), 1.);
+  bias_values.resize(input_shape[3]);
+  fill(bias_values.begin(), bias_values.end(), 0.);
+  weights_bias_shape = {1, input_shape[3]};
+  weights = make_shared<Tensor>(weights_values, weights_bias_shape, logger);
+  bias = make_shared<Tensor>(bias_values, weights_bias_shape, logger);
 
   shared_ptr<Tensor> input_norm = axis_norm_forward(
-      input_tensor, 3, normalization_parameters, averages, variances, true);
+      input_tensor, 3, weights, bias, averages, variances, true);
 
   for (int j = 0; j < input_shape[1]; j++) {
     for (int i = 0; i < input_shape[2]; i++) {
@@ -201,15 +205,17 @@ TEST_F(TensorOpsTest, AxisNormForwardTest) {
 }
 
 TEST_F(TensorOpsTest, AxisNormBackwardTest) {
-  vector<double> normalization_parameters_values(2 * b->shape[2], 0.);
-  fill(normalization_parameters_values.begin(),
-       normalization_parameters_values.begin() + b->shape[2], 1.);
-  shared_ptr<Tensor> normalization_parameters = make_shared<Tensor>(
-      normalization_parameters_values, vector<int>{2, b->shape[2]}, logger);
+  vector<double> weights_values(b->shape[2], 1.);
+  vector<double> bias_values(b->shape[2], 0.);
+  vector<int> weights_bias_shape{1, b->shape[2]};
+  shared_ptr<Tensor> weights =
+      make_shared<Tensor>(weights_values, weights_bias_shape, logger);
+  shared_ptr<Tensor> bias =
+      make_shared<Tensor>(bias_values, weights_bias_shape, logger);
   vector<double> averages(b->shape[2], 0.);
   vector<double> variances(b->shape[2], 0.);
-  shared_ptr<Tensor> c = axis_norm_forward(b, 2, normalization_parameters,
-                                           averages, variances, true);
+  shared_ptr<Tensor> c =
+      axis_norm_forward(b, 2, weights, bias, averages, variances, true);
   fill(c->gradients.begin(), c->gradients.end(), 1.);
   c->backward();
   for (int i = 0; i < b->gradients.size(); i++) {
@@ -242,14 +248,16 @@ TEST_F(TensorOpsTest, AxisNormBackwardTest) {
   double gamma = 4.;
   double beta = 0.;
 
-  normalization_parameters_values.resize(2 * input_shape[3], beta);
-  fill(normalization_parameters_values.begin(),
-       normalization_parameters_values.begin() + input_shape[3], gamma);
-  normalization_parameters = make_shared<Tensor>(
-      normalization_parameters_values, vector<int>{2, input_shape[3]}, logger);
-  shared_ptr<Tensor> input_norm = axis_norm_forward(
-      input_tensor, 3, normalization_parameters, averages, variances, true);
+  weights_values.resize(input_shape[3]);
+  fill(weights_values.begin(), weights_values.end(), gamma);
+  bias_values.resize(input_shape[3]);
+  fill(bias_values.begin(), bias_values.end(), beta);
+  weights_bias_shape = {1, input_shape[3]};
+  weights = make_shared<Tensor>(weights_values, weights_bias_shape, logger);
+  bias = make_shared<Tensor>(bias_values, weights_bias_shape, logger);
 
+  shared_ptr<Tensor> input_norm = axis_norm_forward(
+      input_tensor, 3, weights, bias, averages, variances, true);
   fill(input_norm->gradients.begin(), input_norm->gradients.end(), 1.);
   input_norm->backward();
 
@@ -267,6 +275,8 @@ TEST_F(TensorOpsTest, AxisNormBackwardTest) {
 
   // Zero gradients
   input_norm->zero_gradients();
+  // fill(weights->gradients.begin(), weights->gradients.end(), 0.);
+  // fill(bias->gradients.begin(), bias->gradients.end(), 0.);
 
   vector<double> channel_gradients(input_shape[3], 0.);
   for (int b = 0; b < input_shape[0]; b++) {
@@ -302,9 +312,8 @@ TEST_F(TensorOpsTest, AxisNormBackwardTest) {
   for (int i = 0; i < input_shape[3]; i++) {
     ASSERT_FLOAT_EQ(averages[i], 1. * (i + 2));
     ASSERT_FLOAT_EQ(variances[i], 1.);
-    ASSERT_NEAR(normalization_parameters->gradients[i], 0., 1.0e-5);
-    ASSERT_FLOAT_EQ(normalization_parameters->gradients[input_shape[3] + i],
-                    channel_gradients[i]);
+    ASSERT_NEAR(weights->gradients[i], 0., 1.0e-5);
+    ASSERT_FLOAT_EQ(bias->gradients[i], channel_gradients[i]);
   }
 }
 
