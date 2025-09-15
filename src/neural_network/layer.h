@@ -380,7 +380,7 @@ public:
    * axis
    */
   shared_ptr<Tensor> forward(shared_ptr<Tensor> input, int axis,
-                             bool compute_mean_variance) override {
+                             bool compute_mean_variance) {
 
     if (input->shape[axis] != number_features) {
       throw invalid_argument("Error in BatchNormLayer: Input shape does not "
