@@ -268,6 +268,8 @@ void Tensor::zero_gradients() {
     input_first->zero_gradients();
   if (input_second)
     input_second->zero_gradients();
+  if (input_third)
+    input_third->zero_gradients();
 }
 
 } // namespace ml

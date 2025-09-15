@@ -41,6 +41,11 @@ public:
   shared_ptr<Tensor> input_second = nullptr;
 
   /**
+   * Predecessor in computational graph. Usually not needed in most cases.
+   */
+  shared_ptr<Tensor> input_third = nullptr;
+
+  /**
    * Pointer to gradient function
    */
   std::function<void(shared_ptr<Tensor>)> backward_function;
