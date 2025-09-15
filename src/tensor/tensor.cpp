@@ -7,6 +7,8 @@ Tensor::Tensor(vector<double> values, vector<int> shape,
   update_strides();
   gradients.resize(values.size());
   fill(gradients.begin(), gradients.end(), 0.);
+  velocities.resize(values.size());
+  fill(velocities.begin(), velocities.end(), 0.);
 };
 
 Tensor::Tensor(vector<double> values, vector<int> shape,

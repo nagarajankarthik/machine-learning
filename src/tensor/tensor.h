@@ -26,6 +26,11 @@ public:
   vector<double> gradients = {};
 
   /**
+   * Velocities calculated based on history of gradients
+   */
+  vector<double> velocities = {};
+
+  /**
    * Shape of Tensor
    */
   vector<int> shape = {};
