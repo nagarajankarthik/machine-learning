@@ -483,6 +483,10 @@ inline shared_ptr<Tensor> elementwise_product(shared_ptr<Tensor> t1,
  * transformation
  * @param axis: Axis of input tensor along which slices were taken for
  * normalization
+ * @param weights: Tensor containing values of weights used for linear
+ * transformation after normalization
+ * @param bias: Tensor containing values of bias used for linear
+ * transformation after normalization
  * @param averages: Array of means for each slice of the input tensor to the
  * axis norm operation
  * @param variances: Array of variances for each slice of the input tensor to
@@ -496,9 +500,10 @@ inline void axis_norm_backward(shared_ptr<Tensor> t3, int axis,
                                double epsilon_offset) {
 
   shared_ptr<Tensor> t1 = t3->input_first;
-  shared_ptr<Tensor> normalization_parameters = t3->input_second;
+  shared_ptr<Tensor> weights = t3->input_second;
+  shared_ptr<Tensor> bias = t3->input_third;
   shared_ptr<Logger> logger = t1->logger;
-  if (!t1 || !normalization_parameters)
+  if (!t1 || !weights || !bias)
     return;
   assert(t1->shape.size() == t3->shape.size() &&
          "Error in axis_norm_backward. Input and output tensors must have the "
@@ -535,8 +540,8 @@ inline void axis_norm_backward(shared_ptr<Tensor> t3, int axis,
     double current_average = averages[i];
     double current_variance = variances[i];
     double sqrt_sig2_eps = sqrt(current_variance + epsilon_offset);
-    double gamma = normalization_parameters->get_element({0, i});
-    double beta = normalization_parameters->get_element({1, i});
+    double gamma = weights->values[i];
+    double beta = bias->values[i];
     double sum_gradients = 0.;
     double inner_product_grad_diff = 0.;
     for (int index : subtensor_indices) {
@@ -545,10 +550,9 @@ inline void axis_norm_backward(shared_ptr<Tensor> t3, int axis,
         throw std::runtime_error("gamma is zero in axis_norm_backward");
       }
       double affine_input = (t3->values[index] - beta) / gamma;
-      normalization_parameters->set_element(
-          vector<int>{0, i}, affine_input * t3->gradients[index], "gradients");
-      normalization_parameters->set_element(vector<int>{1, i},
-                                            t3->gradients[index], "gradients");
+      weights->set_element(vector<int>{0, i},
+                           affine_input * t3->gradients[index], "gradients");
+      bias->set_element(vector<int>{0, i}, t3->gradients[index], "gradients");
       sum_gradients += gamma * t3->gradients[index];
       inner_product_grad_diff +=
           gamma * t3->gradients[index] * (t1->values[index] - current_average);
@@ -568,8 +572,10 @@ inline void axis_norm_backward(shared_ptr<Tensor> t3, int axis,
  * Normalizes subsets of input tensor by taking slices along specified axis.
  * @param t1: Input tensor for normalization
  * @param axis: Axis along which slices are taken for normalization
- * @param normalization_parameters: Tensor containing values of parameters used
+ * @param weights: Tensor containing values of weights used
  * for linear transformation after normalization
+ * @param bias: Tensor containing values of bias used for linear
+ * transformation after normalization
  * @param averages: Vector of means for each slice of the input
  * @param variances: Vector of variances for each slice of the input
  * @param compute_mean_variance: Boolean indicating whether to compute mean and
@@ -577,10 +583,9 @@ inline void axis_norm_backward(shared_ptr<Tensor> t3, int axis,
  * @return: Normalized tensor having same shape as the input
  */
 inline shared_ptr<Tensor>
-axis_norm_forward(shared_ptr<Tensor> t1, int axis,
-                  shared_ptr<Tensor> normalization_parameters,
-                  vector<double> &averages, vector<double> &variances,
-                  bool compute_mean_variance) {
+axis_norm_forward(shared_ptr<Tensor> t1, int axis, shared_ptr<Tensor> weights,
+                  shared_ptr<Tensor> bias, vector<double> &averages,
+                  vector<double> &variances, bool compute_mean_variance) {
 
   if (t1->shape[axis] != averages.size()) {
     t1->logger->log(ERROR, "Error in axis_norm_forward. The tensor t1 has " +
@@ -640,18 +645,20 @@ axis_norm_forward(shared_ptr<Tensor> t1, int axis,
                    [current_variance, epsilon_offset](double x) {
                      return x / sqrt(current_variance + epsilon_offset);
                    });
-    double gamma = normalization_parameters->get_element({0, i}, "values");
-    double beta = normalization_parameters->get_element({1, i}, "values");
+    double gamma = weights->values[i];
+    double beta = bias->values[i];
     for (int j = 0; j < differences.size(); j++) {
       t3->values.at(subtensor_indices[j]) = gamma * differences[j] + beta;
     }
   }
   auto axis_norm_back = [axis, averages, variances,
                          epsilon_offset](shared_ptr<Tensor> t3) {
-    axis_norm_backward(t3, axis, averages, variances, epsilon_offset);
+    axis_norm_backward(t3, axis, averages, variances,
+                       epsilon_offset);
   };
   t3->input_first = t1;
-  t3->input_second = normalization_parameters;
+  t3->input_second = weights;
+  t3->input_third = bias;
   t3->backward_function = axis_norm_back;
   return t3;
 }
