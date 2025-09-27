@@ -25,7 +25,7 @@ public:
   // Number of values in bias tensor
   int number_biases = 0;
 
-  // Activation function
+  // Activation function. Default is linear.
   string activation = "linear";
 
   // Logger
@@ -80,6 +80,7 @@ public:
   virtual shared_ptr<Tensor> forward(shared_ptr<Tensor> input) = 0;
 
 private:
+  // Map of initialization methods
   unordered_map<string, function<void()>> _init_methods = {
       {"glorot_normal", [this]() { _initialize_glorot_normal(); }},
       {"glorot_uniform", [this]() { _initialize_glorot_uniform(); }},
@@ -87,6 +88,7 @@ private:
       {"he_uniform", [this]() { _initialize_he_uniform(); }},
       {"pytorch", [this]() { _initialize_pytorch(); }}};
 
+  // Map of activation function gains
   unordered_map<string, double> _activation_gain = {
       {"linear", 1.0},
       {"relu", sqrt(2.0)},
@@ -94,6 +96,7 @@ private:
       {"tanh", 5.0 / 3.0},
       {"sigmoid", 1.0}};
 
+  // Get fan in and fan out
   pair<int, int> _get_fan_in_fan_out() {
     int fan_in = weights->shape[0];
     int fan_out = weights->shape[1];
@@ -110,6 +113,7 @@ private:
                      fan_out * receptive_field_size);
   }
 
+  // Fill tensor with normal distribution
   void _fill_normal(shared_ptr<Tensor> tensor, double mean, double stddev) {
     normal_distribution<double> distribution(mean, stddev);
     for (int i = 0; i < tensor->values.size(); i++) {
@@ -117,6 +121,7 @@ private:
     }
   }
 
+  // Fill tensor with uniform distribution
   void _fill_uniform(shared_ptr<Tensor> tensor, double lower, double upper) {
     uniform_real_distribution<double> distribution(lower, upper);
     for (int i = 0; i < tensor->values.size(); i++) {
