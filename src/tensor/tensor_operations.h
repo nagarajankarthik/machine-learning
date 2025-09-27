@@ -6,6 +6,7 @@ using namespace std;
 
 namespace ml {
 
+// Broadcast shapes of input tensors against one another.
 inline vector<int> broadcast_shape(vector<int> t1_shape, vector<int> t2_shape,
                                    shared_ptr<Logger> logger,
                                    int start_index = 2) {
@@ -43,6 +44,7 @@ inline vector<int> broadcast_shape(vector<int> t1_shape, vector<int> t2_shape,
   return new_shape;
 }
 
+// Add two matrices
 inline vector<vector<double>> add_matrix(vector<vector<double>> m1,
                                          vector<vector<double>> m2,
                                          shared_ptr<Logger> logger) {
@@ -653,8 +655,7 @@ axis_norm_forward(shared_ptr<Tensor> t1, int axis, shared_ptr<Tensor> weights,
   }
   auto axis_norm_back = [axis, averages, variances,
                          epsilon_offset](shared_ptr<Tensor> t3) {
-    axis_norm_backward(t3, axis, averages, variances,
-                       epsilon_offset);
+    axis_norm_backward(t3, axis, averages, variances, epsilon_offset);
   };
   t3->input_first = t1;
   t3->input_second = weights;
@@ -1720,7 +1721,7 @@ inline void max_pool_backward(shared_ptr<Tensor> t3, int kernel_height,
               }
             }
           }
-        end_loop : {}
+        end_loop: {}
         }
       }
     }
