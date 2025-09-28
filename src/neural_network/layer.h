@@ -371,8 +371,8 @@ public:
     vector<int> weights_bias_shape{1, number_features};
     vector<double> weights_values(number_features, 1.0);
     vector<double> bias_values(number_features, 0.0);
-    weights = make_shared<Tensor>(weights_values, weights_bias_shape);
-    bias = make_shared<Tensor>(bias_values, weights_bias_shape);
+    weights = make_shared<Tensor>(weights_values, weights_bias_shape, logger);
+    bias = make_shared<Tensor>(bias_values, weights_bias_shape, logger);
   }
 
   /**
