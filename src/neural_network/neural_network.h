@@ -2,6 +2,7 @@
 #include "layer.h"
 #include "optimizer.h"
 
+#include <memory>
 #include <omp.h>
 #include <random>
 #include <vector>
@@ -38,6 +39,11 @@ public:
    * Batch size
    */
   int batch_size = 1;
+
+  /**
+   * Optimizer
+   */
+  shared_ptr<Optimizer> optimizer = nullptr;
 
   /**
    * An array of Layer objects
