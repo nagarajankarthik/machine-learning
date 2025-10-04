@@ -1,6 +1,7 @@
 #include "json.hpp"
 #include "logging.h"
 #include <memory>
+#include <random>
 #include <string>
 #include <vector>
 
