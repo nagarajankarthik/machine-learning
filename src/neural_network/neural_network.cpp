@@ -22,6 +22,7 @@ NeuralNetwork::NeuralNetwork(nlohmann::json parameters,
   input_shape = parameters["input_shape"].get<vector<int>>();
   labels_shape = parameters["labels_shape"].get<vector<int>>();
   nlohmann::json layer_specifications = input_parameters["layers"];
+  vector<shared_ptr<Tensor>> optimize_params{};
   for (nlohmann::json::iterator it = layer_specifications.begin();
        it != layer_specifications.end(); ++it) {
     nlohmann::json layer_parameters = *it;
@@ -33,6 +34,8 @@ NeuralNetwork::NeuralNetwork(nlohmann::json parameters,
           random_seed, layer_parameters["number_inputs"],
           layer_parameters["number_outputs"], layer_parameters["init_method"],
           layer_parameters["activation"], logger);
+      optimize_params.push_back(layer->weights);
+      optimize_params.push_back(layer->bias);
       break;
     case "convolution":
       layer = make_shared<ConvolutionalLayer>(
@@ -42,6 +45,8 @@ NeuralNetwork::NeuralNetwork(nlohmann::json parameters,
           layer_parameters["stride"], layer_parameters["padding"],
           layer_parameters["dilation_kernel"], layer_parameters["init_method"],
           layer_parameters["activation"], logger);
+      optimize_params.push_back(layer->weights);
+      optimize_params.push_back(layer->bias);
       break;
     case "pooling":
       layer = make_shared<PoolingLayer>(
@@ -58,6 +63,8 @@ NeuralNetwork::NeuralNetwork(nlohmann::json parameters,
       layer = make_shared<BatchNormLayer>(layer_parameters["momentum"],
                                           layer_parameters["number_features"], ,
                                           logger);
+      optimize_params.push_back(layer->weights);
+      optimize_params.push_back(layer->bias);
       break;
     default:
       logger->log(WARNING, "Unknown layer type: " + layer_type);
@@ -66,6 +73,18 @@ NeuralNetwork::NeuralNetwork(nlohmann::json parameters,
     if (layer != nullptr) {
       layers.push_back(layer);
     }
+  }
+  nlohmann::json optimizer_type = input_parameters["optimizer"];
+  switch (optimizer_type) {
+  case "sgd":
+    optimizer = make_shared<SGDOptimizer>(optimize_params, logger);
+    break;
+  default:
+    logger->log(WARNING,
+                "Unknown optimizer type: " + to_string(optimizer_type));
+    logger->log(WARNING, "Defaulting to SGD optimizer.");
+    optimizer = make_shared<SGDOptimizer>(optimize_params, logger);
+    break;
   }
 }
 
@@ -129,7 +148,7 @@ void NeuralNetwork::train_step() {
   for (auto &batch_input : inputs) {
     current_value = batch_input;
     for (auto &layer : layers) {
-      current_value = layer->forward(current_input);
+      current_value = layer->forward(current_value);
     }
   }
 }
