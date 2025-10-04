@@ -68,6 +68,7 @@ TrainTestData Utilities::get_train_test_data(nlohmann::json model_parameters) {
               train_test.train_labels);
     read_data(test_data_path, train_test.test_features, train_test.test_labels);
   }
+  return train_test;
 }
 
 nlohmann::json_abi_v3_11_3::json Utilities::read_json(std::string input_file) {
