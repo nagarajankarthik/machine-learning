@@ -32,14 +32,13 @@ public:
   shared_ptr<Logger> logger = nullptr;
 
   // Map of activation functions
-  unordered_map<string, function<shared_ptr<Tensor>>> _activation_functions = {
-      {"linear", [](shared_ptr<Tensor> x) { return x; }},
-      {"relu", [](shared_ptr<Tensor> x) { return relu_forward(x); }},
-      {"tanh", [](shared_ptr<Tensor> x) { return tanh_forward(x); }},
-      {"sigmoid", [](shared_ptr<Tensor> x) { return sigmoid_forward(x); }},
-      {"softmax", [](shared_ptr<Tensor> x) { return softmax_forward(x); }},
-      {"leaky_relu",
-       [](shared_ptr<Tensor> x) { return leaky_relu_forward(x, 0.01); }}};
+  unordered_map<string, function<shared_ptr<Tensor>(shared_ptr<Tensor>)>>
+      _activation_functions = {
+          {"linear", [](shared_ptr<Tensor> x) { return x; }},
+          {"relu", [](shared_ptr<Tensor> x) { return relu_forward(x); }},
+          {"tanh", [](shared_ptr<Tensor> x) { return tanh_forward(x); }},
+          {"sigmoid", [](shared_ptr<Tensor> x) { return sigmoid_forward(x); }},
+          {"softmax", [](shared_ptr<Tensor> x) { return softmax_forward(x); }}};
 
   Layer() = default;
 
@@ -78,6 +77,9 @@ public:
   };
 
   virtual shared_ptr<Tensor> forward(shared_ptr<Tensor> input) = 0;
+
+  shared_ptr<Tensor> weights = nullptr;
+  shared_ptr<Tensor> bias = nullptr;
 
 private:
   // Map of initialization methods
@@ -166,10 +168,6 @@ private:
     _fill_uniform(weights, -bound, bound);
     _fill_uniform(bias, -inv_sqrt_fan_in, inv_sqrt_fan_in);
   }
-
-protected:
-  shared_ptr<Tensor> weights = nullptr;
-  shared_ptr<Tensor> bias = nullptr;
 };
 
 /**
@@ -305,135 +303,148 @@ public:
     } else if (pooling_type == "average") {
       return average_pool(input, kernel_height, kernel_width, stride, padding,
                           dilation_kernel);
+    } else {
+      throw invalid_argument("Pooling type must be max or average");
     }
-  }
-};
+  };
 
-class ReshapeLayer : public Layer {
-public:
-  // Target shape after reshaping
-  // The target shape should be compatible with the input shape.
-  vector<int> target_shape{};
-  ReshapeLayer(vector<int> target_shape, shared_ptr<Logger> logger)
-      : Layer(logger), target_shape(target_shape) {}
+  class ReshapeLayer : public Layer {
+  public:
+    // Target shape after reshaping
+    // The target shape should be compatible with the input shape.
+    vector<int> target_shape{};
+    ReshapeLayer(vector<int> target_shape, shared_ptr<Logger> logger)
+        : Layer(logger), target_shape(target_shape) {}
 
-  /**
-   * Function to calculate outputs
-   * @param input: Input tensor to layer with arbitrary shape
-   * @return: Output tensor whose shape matches target_shape
-   */
-  shared_ptr<Tensor> forward(shared_ptr<Tensor> input) override {
-    assert(input->values.size() == std::accumulate(target_shape.begin(),
-                                                   target_shape.end(), 1,
-                                                   std::multiplies<int>()));
-    input->reshape(target_shape);
-    return input;
-  }
-};
+    /**
+     * Function to calculate outputs
+     * @param input: Input tensor to layer with arbitrary shape
+     * @return: Output tensor whose shape matches target_shape
+     */
+    shared_ptr<Tensor> forward(shared_ptr<Tensor> input) override {
+      assert(input->values.size() == std::accumulate(target_shape.begin(),
+                                                     target_shape.end(), 1,
+                                                     std::multiplies<int>()));
+      input->reshape(target_shape);
+      return input;
+    }
+  };
 
-class BatchNormLayer : public Layer {
-public:
-  // Number of features
-  int number_features = 0;
+  class BatchNormLayer : public Layer {
+  public:
+    // Number of features
+    int number_features = 0;
 
-  // Number of batches processed thus far
-  int number_batches = 0;
+    // Number of batches processed thus far
+    int number_batches = 0;
 
-  // Running average for batch means
-  double running_average_batch_mean = 0.;
+    // Running average for batch means
+    double running_average_batch_mean = 0.;
 
-  // Running average for batch standard deviation
-  double running_average_batch_std = 0.;
+    // Running average for batch standard deviation
+    double running_average_batch_std = 0.;
 
-  // Weights for linear transformation after normalization.
-  // This is a tensor of shape {1, number_features}.
-  shared_ptr<Tensor> weights = nullptr;
+    // Weights for linear transformation after normalization.
+    // This is a tensor of shape {1, number_features}.
+    shared_ptr<Tensor> weights = nullptr;
 
-  // Weights for linear transformation after normalization.
-  // This is a tensor of shape {1, number_features}.
-  shared_ptr<Tensor> bias = nullptr;
+    // Weights for linear transformation after normalization.
+    // This is a tensor of shape {1, number_features}.
+    shared_ptr<Tensor> bias = nullptr;
 
-  // Momentum for moving average. Should be between 0 and 1. Otherwise, a simple
-  // averaging is performed. See
-  // https://github.com/ptrblck/pytorch_misc/blob/master/batch_norm_manual.py
-  // for more details. This number refers to the weight applied to the
-  // statistics obtained for the most recent batch, when updating the moving
-  // average.
-  double momentum = 0.1;
+    // Momentum for moving average. Should be between 0 and 1. Otherwise, a
+    // simple averaging is performed. See
+    // https://github.com/ptrblck/pytorch_misc/blob/master/batch_norm_manual.py
+    // for more details. This number refers to the weight applied to the
+    // statistics obtained for the most recent batch, when updating the moving
+    // average.
+    double momentum = 0.1;
 
-  BatchNormLayer(double momentum, int number_features,
-                 shared_ptr<Logger> logger)
-      : Layer(logger), number_features(number_features), momentum(momentum) {
+    BatchNormLayer(double momentum, int number_features,
+                   shared_ptr<Logger> logger)
+        : Layer(logger), number_features(number_features), momentum(momentum) {
 
-    vector<double> normalization_parameters_values(2 * number_features, 0.0);
-    fill(normalization_parameters_values.begin(),
-         normalization_parameters_values.begin() + number_features, 1.0);
-    vector<int> weights_bias_shape{1, number_features};
-    vector<double> weights_values(number_features, 1.0);
-    vector<double> bias_values(number_features, 0.0);
-    weights = make_shared<Tensor>(weights_values, weights_bias_shape, logger);
-    bias = make_shared<Tensor>(bias_values, weights_bias_shape, logger);
-  }
-
-  /**
-   * Function to calculate outputs
-   * @param input: Input tensor to layer with arbitrary shape
-   * @param axis: Axis over which normalization is applied
-   * @param compute_mean_variance: Boolean indicating whether to compute mean
-   * and variance or use the existing moving averages
-   * @return: Output tensor after normalization is applied over the specified
-   * axis
-   */
-  shared_ptr<Tensor> forward(shared_ptr<Tensor> input, int axis,
-                             bool compute_mean_variance) {
-
-    if (input->shape[axis] != number_features) {
-      throw invalid_argument("Error in BatchNormLayer: Input shape does not "
-                             "match number of features");
+      vector<double> normalization_parameters_values(2 * number_features, 0.0);
+      fill(normalization_parameters_values.begin(),
+           normalization_parameters_values.begin() + number_features, 1.0);
+      vector<int> weights_bias_shape{1, number_features};
+      vector<double> weights_values(number_features, 1.0);
+      vector<double> bias_values(number_features, 0.0);
+      weights = make_shared<Tensor>(weights_values, weights_bias_shape, logger);
+      bias = make_shared<Tensor>(bias_values, weights_bias_shape, logger);
     }
 
-    number_batches += number_features;
-    vector<double> batch_means(number_features, running_average_batch_mean);
-    vector<double> batch_std(number_features, running_average_batch_std);
-    double average_factor = momentum;
-    if (average_factor < 0) {
-      average_factor = 1. / number_batches;
+    /**
+     * Inherited from Layer. Throws error. Needed to satisfy compiler.
+     * @param input: Input tensor to layer with arbitrary shape
+     * @return: Output tensor after normalization is applied over the specified
+     * axis
+     */
+    shared_ptr<Tensor> forward(shared_ptr<Tensor> input) override {
+      throw std::logic_error(
+          "BatchNormLayer::forward(input) is not supported. Use forward(input, "
+          "axis, compute_mean_variance) instead.");
     }
 
-    int batch_size = 1;
-    for (int i = 0; i < input->shape.size(); i++) {
-      int multiplier = i == axis ? 1 : input->shape[i];
-      batch_size *= multiplier;
-    }
+    /**
+     * Function to calculate outputs
+     * @param input: Input tensor to layer with arbitrary shape
+     * @param axis: Axis over which normalization is applied
+     * @param compute_mean_variance: Boolean indicating whether to compute mean
+     * and variance or use the existing moving averages
+     * @return: Output tensor after normalization is applied over the specified
+     * axis
+     */
+    shared_ptr<Tensor> forward(shared_ptr<Tensor> input, int axis,
+                               bool compute_mean_variance) {
 
-    shared_ptr<Tensor> normalized_input =
-        axis_norm_forward(input, axis, weights, bias, batch_means, batch_std,
-                          compute_mean_variance);
-
-    if (compute_mean_variance) {
-      double batch_means_average =
-          std::accumulate(batch_means.begin(), batch_means.end(), 0.0) /
-          number_features;
-      double batch_std_average =
-          std::accumulate(batch_std.begin(), batch_std.end(), 0.0) /
-          number_features;
-      batch_std_average *= 1. * batch_size / (batch_size - 1);
-
-      // Special treatment for the first set of batches??
-      if (number_batches == number_features) {
-        running_average_batch_mean = batch_means_average;
-        running_average_batch_std = batch_std_average;
-      } else {
-        running_average_batch_mean =
-            average_factor * batch_means_average +
-            (1 - average_factor) * running_average_batch_mean;
-        running_average_batch_std =
-            average_factor * batch_std_average +
-            (1 - average_factor) * running_average_batch_std;
+      if (input->shape[axis] != number_features) {
+        throw invalid_argument("Error in BatchNormLayer: Input shape does not "
+                               "match number of features");
       }
-    }
 
-    return normalized_input;
-  }
-};
+      number_batches += number_features;
+      vector<double> batch_means(number_features, running_average_batch_mean);
+      vector<double> batch_std(number_features, running_average_batch_std);
+      double average_factor = momentum;
+      if (average_factor < 0) {
+        average_factor = 1. / number_batches;
+      }
+
+      int batch_size = 1;
+      for (int i = 0; i < input->shape.size(); i++) {
+        int multiplier = i == axis ? 1 : input->shape[i];
+        batch_size *= multiplier;
+      }
+
+      shared_ptr<Tensor> normalized_input =
+          axis_norm_forward(input, axis, weights, bias, batch_means, batch_std,
+                            compute_mean_variance);
+
+      if (compute_mean_variance) {
+        double batch_means_average =
+            std::accumulate(batch_means.begin(), batch_means.end(), 0.0) /
+            number_features;
+        double batch_std_average =
+            std::accumulate(batch_std.begin(), batch_std.end(), 0.0) /
+            number_features;
+        batch_std_average *= 1. * batch_size / (batch_size - 1);
+
+        // Special treatment for the first set of batches??
+        if (number_batches == number_features) {
+          running_average_batch_mean = batch_means_average;
+          running_average_batch_std = batch_std_average;
+        } else {
+          running_average_batch_mean =
+              average_factor * batch_means_average +
+              (1 - average_factor) * running_average_batch_mean;
+          running_average_batch_std =
+              average_factor * batch_std_average +
+              (1 - average_factor) * running_average_batch_std;
+        }
+      }
+
+      return normalized_input;
+    }
+  };
 } // namespace ml
