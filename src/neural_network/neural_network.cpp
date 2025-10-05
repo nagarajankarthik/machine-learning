@@ -6,8 +6,8 @@ using namespace std;
 
 namespace ml {
 NeuralNetwork::NeuralNetwork(nlohmann::json parameters,
-                             shared_ptr<Logger> logger)::BaseModel(parameters,
-                                                                   logger) {
+                             shared_ptr<Logger> logger)
+    : BaseModel(parameters, logger) {
 
   if (parameters.contains("batch_size")) {
     int batch_size_input = parameters["batch_size"];
@@ -19,25 +19,33 @@ NeuralNetwork::NeuralNetwork(nlohmann::json parameters,
           "The specified batch size, " + to_string(batch_size_input) +
               " is invalid. The default batch size of 1 will be used instead.");
   }
+  if (parameters.contains("number_epochs")) {
+    int number_epochs_input = parameters["number_epochs"];
+    if (number_epochs_input > 0)
+      number_epochs = number_epochs_input;
+    else
+      logger->log(WARNING, "The specified number of epochs, " +
+                               to_string(number_epochs_input) +
+                               " is invalid. The default number of epochs, 1, "
+                               "will be used instead.");
+  }
   input_shape = parameters["input_shape"].get<vector<int>>();
   labels_shape = parameters["labels_shape"].get<vector<int>>();
-  nlohmann::json layer_specifications = input_parameters["layers"];
+  nlohmann::json layer_specifications = parameters["layers"];
   vector<shared_ptr<Tensor>> optimize_params{};
   for (nlohmann::json::iterator it = layer_specifications.begin();
        it != layer_specifications.end(); ++it) {
     nlohmann::json layer_parameters = *it;
     string layer_type = layer_parameters["type"];
     shared_ptr<Layer> layer = nullptr;
-    switch (layer_type) {
-    case "fully_connected":
+    if (layer_type == "fully_connected") {
       layer = make_shared<FullConnectedLayer>(
           random_seed, layer_parameters["number_inputs"],
           layer_parameters["number_outputs"], layer_parameters["init_method"],
           layer_parameters["activation"], logger);
       optimize_params.push_back(layer->weights);
       optimize_params.push_back(layer->bias);
-      break;
-    case "convolution":
+    } else if (layer_type == "convolution") {
       layer = make_shared<ConvolutionalLayer>(
           random_seed, layer_parameters["input_channels"],
           layer_parameters["output_channels"],
@@ -47,51 +55,45 @@ NeuralNetwork::NeuralNetwork(nlohmann::json parameters,
           layer_parameters["activation"], logger);
       optimize_params.push_back(layer->weights);
       optimize_params.push_back(layer->bias);
-      break;
-    case "pooling":
+    } else if (layer_type == "pooling") {
       layer = make_shared<PoolingLayer>(
           layer_parameters["kernel_height"], layer_parameters["kernel_width"],
           layer_parameters["stride"], layer_parameters["padding"],
           layer_parameters["dilation_kernel"], layer_parameters["pooling_type"],
           logger);
-      break;
-    case "reshape":
+    } else if (layer_type == "reshape") {
       layer =
           make_shared<ReshapeLayer>(layer_parameters["target_shape"], logger);
-      break;
-    case "batch_norm":
+    } else if (layer_type == "batch_norm") {
       layer = make_shared<BatchNormLayer>(layer_parameters["momentum"],
-                                          layer_parameters["number_features"], ,
+                                          layer_parameters["number_features"],
                                           logger);
       optimize_params.push_back(layer->weights);
       optimize_params.push_back(layer->bias);
-      break;
-    default:
+    } else {
       logger->log(WARNING, "Unknown layer type: " + layer_type);
-      break;
     }
     if (layer != nullptr) {
       layers.push_back(layer);
     }
   }
-  nlohmann::json optimizer_type = input_parameters["optimizer"];
-  switch (optimizer_type) {
-  case "sgd":
+  nlohmann::json optimizer_type = parameters["optimizer"];
+  if (optimizer_type == "sgd") {
     optimizer = make_shared<SGDOptimizer>(optimize_params, logger);
-    break;
-  default:
+  } else {
     logger->log(WARNING,
                 "Unknown optimizer type: " + to_string(optimizer_type));
     logger->log(WARNING, "Defaulting to SGD optimizer.");
     optimizer = make_shared<SGDOptimizer>(optimize_params, logger);
-    break;
   }
+  string loss_type = parameters["loss"];
+  loss_function = _loss_functions[loss_type];
 }
 
-void NeuralNetwork::prepare_input(vector<vector<double>> features,
-                                  vector<vector<double>> labels) {
+void NeuralNetwork::prepare_input(const vector<vector<double>> &features,
+                                  const vector<vector<double>> &input_labels) {
 
-  if (features.size() != labels.size()) {
+  if (features.size() != input_labels.size()) {
     logger->log(
         ERROR,
         "Features and Labels datasets have different numbers of records.");
@@ -99,7 +101,7 @@ void NeuralNetwork::prepare_input(vector<vector<double>> features,
   }
   int number_training_examples = features.size();
   int number_features = features[0].size();
-  int number_outputs = labels[0].size();
+  int number_outputs = input_labels[0].size();
   int number_batches = number_training_examples / batch_size;
   int first_batch_size = batch_size + (number_training_examples % batch_size);
 
@@ -109,7 +111,7 @@ void NeuralNetwork::prepare_input(vector<vector<double>> features,
   for (int i = 0; i < first_batch_size; i++) {
     for (int j = 0; j < number_features; j++) {
       first_batch_input[i * number_features + j] = features[i][j];
-      first_batch_labels[i * number_outputs + j] = labels[i][j];
+      first_batch_labels[i * number_outputs + j] = input_labels[i][j];
     }
   }
   vector<int> first_input_shape(input_shape.begin(), input_shape.end());
@@ -130,7 +132,8 @@ void NeuralNetwork::prepare_input(vector<vector<double>> features,
     for (int j = 0; j < batch_size; j++) {
       for (int k = 0; k < number_features; k++) {
         batch_input[j * number_features + k] = features[i * batch_size + j][k];
-        batch_labels[j * number_outputs + k] = labels[i * batch_size + j][k];
+        batch_labels[j * number_outputs + k] =
+            input_labels[i * batch_size + j][k];
       }
     }
     shared_ptr<Tensor> input_tensor =
@@ -142,15 +145,30 @@ void NeuralNetwork::prepare_input(vector<vector<double>> features,
   }
 }
 
-void NeuralNetwork::train_step() {
+void NeuralNetwork::train_epoch(int current_epoch) {
   shared_ptr<Tensor> current_value = nullptr;
-
-  for (auto &batch_input : inputs) {
-    current_value = batch_input;
+  shared_ptr<Tensor> loss = nullptr;
+  for (int i = 0; i < inputs.size(); i++) {
+    optimizer->zero_gradients();
+    current_value = inputs[i];
     for (auto &layer : layers) {
       current_value = layer->forward(current_value);
     }
+    loss = loss_function(current_value, labels[i]);
+    logger->log(INFO, "Loss values at epoch " + to_string(current_epoch));
+    for (int i = 0; i < loss->values.size(); i++) {
+      logger->log(INFO, to_string(loss->values[i]));
+    }
+    loss->backward();
+    optimizer->step();
   }
 }
 
+void NeuralNetwork::fit(const vector<vector<double>> &&features,
+                        const vector<vector<double>> &&labels) {
+  prepare_input(features, labels);
+  for (int i = 0; i < number_epochs; i++) {
+    train_epoch(i);
+  }
+}
 } // namespace ml
