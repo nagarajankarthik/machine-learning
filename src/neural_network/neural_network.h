@@ -36,6 +36,11 @@ public:
   vector<shared_ptr<Tensor>> labels{};
 
   /**
+   * Number of epochs
+   */
+  int number_epochs = 1;
+
+  /**
    * Batch size
    */
   int batch_size = 1;
@@ -49,6 +54,26 @@ public:
    * An array of Layer objects
    */
   vector<shared_ptr<Layer>> layers{};
+
+  /**
+   * Loss functions
+   */
+  unordered_map<string, function<shared_ptr<Tensor>(shared_ptr<Tensor>,
+                                                    shared_ptr<Tensor>)>>
+      _loss_functions = {{"cross_entropy",
+                          [](shared_ptr<Tensor> x, shared_ptr<Tensor> y) {
+                            return categorical_cross_entropy_forward(x, y);
+                          }},
+                         {"mean_squared_error",
+                          [](shared_ptr<Tensor> x, shared_ptr<Tensor> y) {
+                            return mean_squared_error_forward(x, y);
+                          }}};
+
+  /**
+   * Loss function
+   **/
+  function<shared_ptr<Tensor>(shared_ptr<Tensor>, shared_ptr<Tensor>)>
+      loss_function;
 
   /**
    * Constructor
@@ -74,7 +99,7 @@ public:
   /**
    * Perform a single training epoch
    */
-  void train_step();
+  void train_epoch(int current_epoch);
 
   /**
    * Perform model inference
