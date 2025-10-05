@@ -28,12 +28,22 @@ public:
   /**
    * Array of input tensors
    */
-  vector<shared_ptr<Tensor>> inputs{};
+  vector<shared_ptr<Tensor>> train_inputs{};
 
   /**
    * Array of ground truth label tensors
    */
-  vector<shared_ptr<Tensor>> labels{};
+  vector<shared_ptr<Tensor>> train_labels{};
+
+  /**
+   * Array of input tensors
+   */
+  shared_ptr<Tensor> inference_inputs = nullptr;
+
+  /**
+   * Array of ground truth label tensors
+   */
+  shared_ptr<Tensor> inference_labels = nullptr;
 
   /**
    * Number of epochs
@@ -88,14 +98,33 @@ public:
   /**
    * Prepare input tensors for training
    */
-  void prepare_input(const vector<vector<double>> &features,
-                     const vector<vector<double>> &labels);
+  void prepare_train_input(const vector<vector<double>> &features,
+                           const vector<vector<double>> &input_labels);
 
+  /**
+   * Prepare input tensors for training
+   */
+  void prepare_inference_input(const vector<vector<double>> &features,
+                               const vector<vector<double>> &labels);
   /**
    * Perform model training.
    */
   void fit(const vector<vector<double>> &&features,
            const vector<vector<double>> &&labels);
+
+  /**
+   * Calculate validation loss.
+   */
+  void validate(int current_epoch);
+
+  /**
+   * Perform model training and evaluation with validation data
+   * */
+  void fit_eval(const vector<vector<double>> &&train_features,
+                const vector<vector<double>> &&train_labels,
+                const vector<vector<double>> &&validation_features,
+                const vector<vector<double>> &&validation_labels);
+
   /**
    * Perform a single training epoch
    */
