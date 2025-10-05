@@ -65,10 +65,9 @@ NeuralNetwork::NeuralNetwork(nlohmann::json parameters,
       layer =
           make_shared<ReshapeLayer>(layer_parameters["target_shape"], logger);
     } else if (layer_type == "batch_norm") {
-      layer = make_shared<BatchNormLayer>(layer_parameters["momentum"],
-                                          layer_parameters["number_features"],
-                                          logger);
-      optimize_params.push_back(layer->weights);
+      layer = make_shared<BatchNormLayer>(layer_parameters["number_features"],
+                                          layer_parameters["momentum"],
+                                          layer_parameters["axis"], logger);
       optimize_params.push_back(layer->bias);
     } else {
       logger->log(WARNING, "Unknown layer type: " + layer_type);
@@ -90,10 +89,37 @@ NeuralNetwork::NeuralNetwork(nlohmann::json parameters,
   loss_function = _loss_functions[loss_type];
 }
 
-void NeuralNetwork::prepare_input(const vector<vector<double>> &features,
-                                  const vector<vector<double>> &input_labels) {
+void NeuralNetwork::prepare_inference_input(
+    const vector<vector<double>> &features,
+    const vector<vector<double>> &labels) {
+  if (features.size() != labels.size()) {
+    logger->log(
+        ERROR,
+        "Features and Labels datasets have different numbers of records.");
+    exit(EXIT_FAILURE);
+  }
+  vector<double> input_values(features.size() * features[0].size(), 0.0);
+  vector<double> label_values(labels.size() * labels[0].size(), 0.0);
+  for (int i = 0; i < features.size(); i++) {
+    for (int j = 0; j < features[0].size(); j++) {
+      input_values[i * features[0].size() + j] = features[i][j];
+      label_values[i * labels[0].size() + j] = labels[i][j];
+    }
+  }
+  vector<int> inference_input_shape(input_shape.begin(), input_shape.end());
+  vector<int> inference_labels_shape(labels_shape.begin(), labels_shape.end());
+  inference_input_shape[0] = features.size();
+  inference_labels_shape[0] = labels.size();
+  inference_inputs =
+      make_shared<Tensor>(input_values, inference_input_shape, logger);
+  inference_labels =
+      make_shared<Tensor>(label_values, inference_labels_shape, logger);
+}
 
-  if (features.size() != input_labels.size()) {
+void NeuralNetwork::prepare_train_input(const vector<vector<double>> &features,
+                                        const vector<vector<double>> &labels) {
+
+  if (features.size() != labels.size()) {
     logger->log(
         ERROR,
         "Features and Labels datasets have different numbers of records.");
@@ -101,7 +127,7 @@ void NeuralNetwork::prepare_input(const vector<vector<double>> &features,
   }
   int number_training_examples = features.size();
   int number_features = features[0].size();
-  int number_outputs = input_labels[0].size();
+  int number_outputs = labels[0].size();
   int number_batches = number_training_examples / batch_size;
   int first_batch_size = batch_size + (number_training_examples % batch_size);
 
@@ -111,7 +137,7 @@ void NeuralNetwork::prepare_input(const vector<vector<double>> &features,
   for (int i = 0; i < first_batch_size; i++) {
     for (int j = 0; j < number_features; j++) {
       first_batch_input[i * number_features + j] = features[i][j];
-      first_batch_labels[i * number_outputs + j] = input_labels[i][j];
+      first_batch_labels[i * number_outputs + j] = labels[i][j];
     }
   }
   vector<int> first_input_shape(input_shape.begin(), input_shape.end());
@@ -122,8 +148,8 @@ void NeuralNetwork::prepare_input(const vector<vector<double>> &features,
       make_shared<Tensor>(first_batch_input, first_input_shape, logger);
   shared_ptr<Tensor> first_labels_tensor =
       make_shared<Tensor>(first_batch_labels, first_labels_shape, logger);
-  inputs.push_back(first_input_tensor);
-  labels.push_back(first_labels_tensor);
+  train_inputs.push_back(first_input_tensor);
+  train_labels.push_back(first_labels_tensor);
 
   // prepare input tensor for subsequent batches
   for (int i = 1; i < number_batches; i++) {
@@ -132,29 +158,30 @@ void NeuralNetwork::prepare_input(const vector<vector<double>> &features,
     for (int j = 0; j < batch_size; j++) {
       for (int k = 0; k < number_features; k++) {
         batch_input[j * number_features + k] = features[i * batch_size + j][k];
-        batch_labels[j * number_outputs + k] =
-            input_labels[i * batch_size + j][k];
+        batch_labels[j * number_outputs + k] = labels[i * batch_size + j][k];
       }
     }
     shared_ptr<Tensor> input_tensor =
         make_shared<Tensor>(batch_input, input_shape, logger);
     shared_ptr<Tensor> labels_tensor =
         make_shared<Tensor>(batch_labels, labels_shape, logger);
-    inputs.push_back(input_tensor);
-    labels.push_back(labels_tensor);
+    train_inputs.push_back(input_tensor);
+    train_labels.push_back(labels_tensor);
   }
 }
 
 void NeuralNetwork::train_epoch(int current_epoch) {
   shared_ptr<Tensor> current_value = nullptr;
   shared_ptr<Tensor> loss = nullptr;
-  for (int i = 0; i < inputs.size(); i++) {
+  for (int i = 0; i < train_inputs.size(); i++) {
     optimizer->zero_gradients();
-    current_value = inputs[i];
+    current_value = train_inputs[i];
+    ForwardParams forward_params{current_value, true};
     for (auto &layer : layers) {
-      current_value = layer->forward(current_value);
+      current_value = layer->forward(forward_params);
+      forward_params.input = current_value;
     }
-    loss = loss_function(current_value, labels[i]);
+    loss = loss_function(current_value, train_labels[i]);
     logger->log(INFO, "Loss values at epoch " + to_string(current_epoch));
     for (int i = 0; i < loss->values.size(); i++) {
       logger->log(INFO, to_string(loss->values[i]));
@@ -164,11 +191,61 @@ void NeuralNetwork::train_epoch(int current_epoch) {
   }
 }
 
+void NeuralNetwork::validate(int current_epoch) {
+  shared_ptr<Tensor> current_value = inference_inputs;
+  shared_ptr<Tensor> loss = nullptr;
+  ForwardParams forward_params{current_value, false};
+
+  for (auto &layer : layers) {
+    current_value = layer->forward(forward_params);
+    forward_params.input = current_value;
+  }
+  loss = loss_function(current_value, inference_labels);
+  logger->log(INFO,
+              "Validation loss values at epoch " + to_string(current_epoch));
+  for (int i = 0; i < loss->values.size(); i++) {
+    logger->log(INFO, to_string(loss->values[i]));
+  }
+}
+
+void NeuralNetwork::fit_eval(const vector<vector<double>> &&train_features,
+                             const vector<vector<double>> &&train_labels,
+                             const vector<vector<double>> &&validation_features,
+                             const vector<vector<double>> &&validation_labels) {
+  prepare_train_input(train_features, train_labels);
+  prepare_inference_input(validation_features, validation_labels);
+  for (int i = 0; i < number_epochs; i++) {
+    train_epoch(i);
+    validate(i);
+  }
+}
 void NeuralNetwork::fit(const vector<vector<double>> &&features,
                         const vector<vector<double>> &&labels) {
-  prepare_input(features, labels);
+  prepare_train_input(features, labels);
   for (int i = 0; i < number_epochs; i++) {
     train_epoch(i);
   }
+}
+
+// TODO: Currently included as a placeholder to enable compilation.
+vector<vector<double>>
+NeuralNetwork::predict(const vector<vector<double>> &features) {
+  prepare_inference_input(features, vector<vector<double>>());
+  shared_ptr<Tensor> current_value = nullptr;
+  shared_ptr<Tensor> loss = nullptr;
+  ForwardParams forward_params{inference_inputs, false};
+  for (auto &layer : layers) {
+    current_value = layer->forward(forward_params);
+    forward_params.input = current_value;
+  }
+  loss = loss_function(current_value, inference_labels);
+  vector<vector<double>> predictions{};
+  return predictions;
+}
+
+void NeuralNetwork::evaluate(const vector<vector<double>> &features,
+                             const vector<vector<double>> &labels) {
+  prepare_inference_input(features, labels);
+  validate(0);
 }
 } // namespace ml
