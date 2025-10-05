@@ -2,6 +2,7 @@
 #include <cassert>
 #include <math.h>
 #include <numeric>
+#pragma once
 using namespace std;
 
 namespace ml {
@@ -1339,7 +1340,7 @@ mean_squared_error_forward(shared_ptr<Tensor> predicted,
  * @param kernel: Tensor with shape (num_filters, kernel_height,
  * kernel_width, channels).
  */
-void flip_kernel(shared_ptr<Tensor> kernel) {
+inline void flip_kernel(shared_ptr<Tensor> kernel) {
   vector<int> kernel_shape = kernel->shape;
   int height = kernel_shape[1];
   int width = kernel_shape[2];
