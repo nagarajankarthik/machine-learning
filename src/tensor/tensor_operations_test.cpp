@@ -547,7 +547,7 @@ TEST_F(TensorOpsTest, TanhBackwardTest) {
 
 TEST_F(TensorOpsTest, SoftmaxForwardTest) {
 
-  a->values = {-1., -1., 1., 1.};
+  a->values = {-1., 1., -1., 1.};
   shared_ptr<Tensor> c = softmax_forward(a);
   logger->log(INFO, "Created tensor c by applying softmax function to a.");
   ASSERT_EQ(c->values.size(), 4);
@@ -559,11 +559,9 @@ TEST_F(TensorOpsTest, SoftmaxForwardTest) {
   vector<int> position{0};
   vector<vector<double>> matrix = c->get_matrix(position, "values");
   double e2 = exp(2.);
-  for (int j = 0; j < matrix[0].size(); j++) {
-    ASSERT_FLOAT_EQ(matrix[0][j], 1. / (1. + e2));
-  }
-  for (int j = 0; j < matrix[0].size(); j++) {
-    ASSERT_FLOAT_EQ(matrix[1][j], e2 / (1. + e2));
+  for (int i = 0; i < matrix.size(); i++) {
+    ASSERT_FLOAT_EQ(matrix[i][0], 1. / (1. + e2));
+    ASSERT_FLOAT_EQ(matrix[i][1], e2 / (1. + e2));
   }
 }
 
@@ -586,7 +584,7 @@ TEST_F(TensorOpsTest, SoftmaxBackwardTest) {
       double expected_derivative =
           softmax_values[i][j] *
           (softmax_derivatives[i][j] -
-           matrix_col_sum(elementwise_multiplication(
+           matrix_row_sum(elementwise_multiplication(
                softmax_derivatives, softmax_values, logger))[j]);
       ASSERT_FLOAT_EQ(calculated_derivatives[i][j], expected_derivative);
     }
@@ -595,7 +593,7 @@ TEST_F(TensorOpsTest, SoftmaxBackwardTest) {
 
 TEST_F(TensorOpsTest, CrossEntropyForwardTest) {
   vector<int> test_shape{1, 2, 2};
-  vector<double> predicted_values{0.8, 0.1, 0.2, 0.9};
+  vector<double> predicted_values{0.8, 0.2, 0.1, 0.9};
   vector<double> ground_truth_values{1., 0., 0., 1.};
   shared_ptr<Tensor> predicted =
       make_shared<Tensor>(predicted_values, test_shape, logger);
@@ -609,18 +607,18 @@ TEST_F(TensorOpsTest, CrossEntropyForwardTest) {
   vector<int> loss_shape = loss->shape;
   ASSERT_EQ(loss_shape.size(), 3);
   ASSERT_EQ(loss_shape[0], predicted->shape[0]);
-  ASSERT_EQ(loss_shape[1], 1);
-  ASSERT_EQ(loss_shape[2], predicted->shape[2]);
+  ASSERT_EQ(loss_shape[1], predicted->shape[1]);
+  ASSERT_EQ(loss_shape[2], 1);
   vector<int> position{0};
   vector<vector<double>> loss_values = loss->get_matrix(position, "values");
   ASSERT_FLOAT_EQ(loss_values[0][0], -log(0.8));
-  ASSERT_FLOAT_EQ(loss_values[0][1], -log(0.9));
+  ASSERT_FLOAT_EQ(loss_values[1][0], -log(0.9));
 }
 
 TEST_F(TensorOpsTest, CrossEntropyBackwardTest) {
 
   vector<int> test_shape{1, 2, 2};
-  vector<double> predicted_values{0.8, 0.1, 0.2, 0.9};
+  vector<double> predicted_values{0.8, 0.2, 0.1, 0.9};
   vector<double> ground_truth_values{1., 0., 0., 1.};
   shared_ptr<Tensor> predicted =
       make_shared<Tensor>(predicted_values, test_shape, logger);
