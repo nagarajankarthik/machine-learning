@@ -31,7 +31,7 @@ public:
 
   virtual void step() = 0;
 
-  virtual ~Optimizer() {}
+  // virtual ~Optimizer() {}
 
   void zero_gradients() {
     for (shared_ptr<Tensor> parameter : optimize_parameters) {
@@ -46,13 +46,14 @@ public:
 class SGDOptimizer : public Optimizer {
 public:
   // Learning rate
-  double learning_rate = 0.0;
+  double learning_rate = 0.01;
 
   // Momentum
-  double momentum = 0.0;
+  double momentum = 0.9;
 
   SGDOptimizer(vector<shared_ptr<Tensor>> optimize_parameters,
-               double learning_rate, double momentum, shared_ptr<Logger> logger)
+               shared_ptr<Logger> logger, double learning_rate = 0.01,
+               double momentum = 0.9)
       : Optimizer(optimize_parameters, logger), learning_rate(learning_rate),
         momentum(momentum) {}
 
