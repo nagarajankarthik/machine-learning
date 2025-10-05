@@ -69,9 +69,7 @@ public:
                   "Using non-pytorch initialization method. Correctness "
                   "of initialization is not guaranteed.");
 
-    if (activation != "linear" && activation != "relu" &&
-        activation != "leaky_relu" && activation != "tanh" &&
-        activation != "sigmoid") {
+    if (_activation_functions.find(activation) == _activation_functions.end()) {
       throw invalid_argument("Unknown activation function: " + activation);
     }
 
