@@ -1080,6 +1080,21 @@ inline vector<double> matrix_col_sum(vector<vector<double>> matrix) {
   return result;
 }
 
+/**
+ * Returns the sum of the values in each row of the input matrix.
+ */
+inline vector<double> matrix_row_sum(vector<vector<double>> matrix) {
+  vector<double> result(matrix.size(), 0.);
+  for (int i = 0; i < matrix.size(); i++) {
+    double sum = 0.;
+    for (int j = 0; j < matrix[0].size(); j++) {
+      sum += matrix[i][j];
+    }
+    result[i] = sum;
+  }
+  return result;
+}
+
 inline void recurse_softmax_backward(const shared_ptr<Tensor> t3,
                                      shared_ptr<Tensor> t1,
                                      vector<int> &new_position, int axis = 0) {
@@ -1090,7 +1105,7 @@ inline void recurse_softmax_backward(const shared_ptr<Tensor> t3,
     vector<vector<double>> gradient_values_product =
         elementwise_multiplication(g3, m3, t1->logger);
     vector<double> gradient_values_product_sum =
-        matrix_col_sum(gradient_values_product);
+        matrix_row_sum(gradient_values_product);
 
     vector<vector<double>> g1(g3.size(), vector<double>(g3[0].size(), 0.));
     for (int j = 0; j < g1[0].size(); j++) {
@@ -1125,13 +1140,13 @@ inline vector<vector<double>> evaluate_softmax(const vector<vector<double>> &m1,
                                                shared_ptr<Logger> logger) {
   vector<vector<double>> softmax_result(m1.size(),
                                         vector<double>(m1[0].size(), 0.));
-  for (int j = 0; j < m1[0].size(); j++) {
+  for (int i = 0; i < m1.size(); i++) {
     double sum = 0.;
-    for (int i = 0; i < m1.size(); i++) {
+    for (int j = 0; j < m1[0].size(); j++) {
       softmax_result[i][j] = exp(m1[i][j]);
       sum += softmax_result[i][j];
     }
-    for (int i = 0; i < m1.size(); i++) {
+    for (int j = 0; j < m1[0].size(); j++) {
       softmax_result[i][j] /= sum;
     }
   }
@@ -1186,10 +1201,11 @@ recurse_cross_entropy_backward(shared_ptr<Tensor> predicted,
         predicted_values.size(),
         vector<double>(predicted_values[0].size(), 0.));
 
-    for (int j = 0; j < predicted_values[0].size(); j++) {
-      for (int i = 0; i < predicted_values.size(); i++) {
-        loss_gradient[i][j] =
-            -1.0 * ground_truth_values[i][j] / predicted_values[i][j];
+    for (int i = 0; i < predicted_values.size(); i++) {
+      for (int j = 0; j < predicted_values[0].size(); j++) {
+        double epsilon = 1.0e-10;
+        loss_gradient[i][j] = -1.0 * ground_truth_values[i][j] /
+                              (predicted_values[i][j] + epsilon);
       }
     }
     predicted->set_matrix(new_position, loss_gradient, "gradients");
@@ -1227,13 +1243,13 @@ evaluate_cross_entropy(vector<vector<double>> predicted,
                        "evaluate_cross_entropy.");
     exit(1);
   }
-  vector<double> loss(predicted[0].size(), 0.);
-  for (int j = 0; j < predicted[0].size(); j++) {
+  vector<double> loss(predicted.size(), 0.);
+  for (int i = 0; i < predicted.size(); i++) {
     double cross_entropy = 0.;
-    for (int i = 0; i < predicted.size(); i++) {
+    for (int j = 0; j < predicted[0].size(); j++) {
       cross_entropy += ground_truth[i][j] * log(predicted[i][j]);
     }
-    loss[j] = -cross_entropy;
+    loss[i] = -cross_entropy;
   }
   return loss;
 }
@@ -1247,9 +1263,12 @@ inline void recurse_cross_entropy_forward(shared_ptr<Tensor> loss,
   if (axis == loss->shape.size() - 2) {
     vector<vector<double>> m1 = predicted->get_matrix(new_position);
     vector<vector<double>> m2 = ground_truth->get_matrix(new_position);
+    vector<vector<double>> result(m1.size(), vector<double>(1, 0.));
     vector<double> cross_entropy_loss =
         evaluate_cross_entropy(m1, m2, predicted->logger);
-    vector<vector<double>> result{cross_entropy_loss};
+    for (int i = 0; i < cross_entropy_loss.size(); i++) {
+      result[i][0] = cross_entropy_loss[i];
+    }
     loss->set_matrix(new_position, result, "values");
     return;
   }
@@ -1278,7 +1297,7 @@ categorical_cross_entropy_forward(shared_ptr<Tensor> predicted,
 
   vector<int> loss_shape = predicted->shape;
   int last_index = loss_shape.size() - 1;
-  loss_shape[last_index - 1] = 1;
+  loss_shape[last_index] = 1;
 
   int number_elements = 1;
   for (int i = 0; i < loss_shape.size(); i++) {
