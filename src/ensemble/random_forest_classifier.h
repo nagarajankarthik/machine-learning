@@ -2,60 +2,85 @@
  * header file for random forest class
  */
 #include "decision_tree_classifier.h"
-#include <random>
 #include <omp.h>
+#include <random>
 
 using namespace std;
 
-namespace ml
-{
+namespace ml {
 
-	class RandomForestClassifier: public BaseModel
-	{
-	public:
+class RandomForestClassifier : public BaseModel {
+public:
+  /**
+   * Parameters to pass to Decision Tree constructor
+   */
+  nlohmann::json parameters;
 
-		/**
-		 * Parameters to pass to Decision Tree constructor
-		 */
-		nlohmann::json parameters ;
+  // Number of trees
+  int number_trees = 20;
 
-		// Number of trees
-		int number_trees = 20;
+  /**
+   * An array of decision trees
+   */
+  vector<shared_ptr<DecisionTreeClassifier>> trees{};
 
-		/**
-		 * An array of decision trees
-		 */
-		vector<shared_ptr<DecisionTreeClassifier>> trees {};
+  // Train and test data
 
-		/**
-		 * Constructor
-		 */
-		RandomForestClassifier(nlohmann::json parameters, shared_ptr<Logger> logger)  ;
+  /**
+   * Training features
+   */
+  vector<vector<double>> train_features{};
 
-		/**
-		 * Destructor
-		 */
-		~RandomForestClassifier() {};
+  /**
+   * Training labels
+   */
+  vector<vector<double>> train_labels{};
 
-		/**
-		 * Get bootstrap sample
-		 */
-		void get_bootstrap_sample(vector<vector<double>> & features_sample, vector<vector<double>> & outputs_sample);
+  /**
+   * Test features
+   */
+  vector<vector<double>> test_features{};
 
-		/**
-		 * Perform model training.
-		 */
-		void fit(const vector<vector<double>> && features, const vector<vector<double>> && labels) ;
+  /**
+   * Test labels
+   */
+  vector<vector<double>> test_labels{};
 
-		/**
-		 * Perform model inference
-		 */
-		vector<vector<double>> predict(const vector<vector<double>> & test_features);
+  /**
+   * Constructor
+   */
+  RandomForestClassifier(nlohmann::json parameters, shared_ptr<Logger> logger);
 
-		/**
-		 * Evaluate model using test data
-		 */
-		void evaluate(const vector<vector<double>> & test_features, const vector<vector<double>> & test_labels) ;
-	};
-	
-}
+  /**
+   * Destructor
+   */
+  ~RandomForestClassifier() {};
+
+  /**
+   * Initialize data
+   */
+  void set_data(TrainTestData &&train_test);
+
+  /**
+   * Get bootstrap sample
+   */
+  void get_bootstrap_sample(vector<vector<double>> &features_sample,
+                            vector<vector<double>> &outputs_sample);
+
+  /**
+   * Perform model training.
+   */
+  void fit();
+
+  /**
+   * Perform model inference
+   */
+  vector<vector<double>> predict();
+
+  /**
+   * Evaluate model using test data
+   */
+  void evaluate();
+};
+
+} // namespace ml
