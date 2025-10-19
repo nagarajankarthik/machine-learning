@@ -1,5 +1,6 @@
 #include "../utils/json.hpp"
 #include "../utils/logging.h"
+#include "../utils/utils.h"
 #include <algorithm>
 #include <random>
 #include <unordered_set>
@@ -35,16 +36,6 @@ public:
   std::mt19937 random_generator;
 
   /**
-   * Features for training data
-   */
-  vector<vector<double>> train_features{};
-
-  /**
-   * Labels for training data
-   */
-  vector<vector<double>> train_labels{};
-
-  /**
    * Logger
    */
   shared_ptr<Logger> logger;
@@ -57,19 +48,23 @@ public:
   /**
    * Destructor for base model
    */
-  ~BaseModel() {};
+  virtual ~BaseModel() {};
+
+  /**
+   * Prototype for data initialization
+   */
+  virtual void set_data(TrainTestData &&train_test) = 0;
 
   /**
    * Prototype for model training
    */
-  virtual void fit(const vector<vector<double>> &&features,
-                   const vector<vector<double>> &&labels) = 0;
+  virtual void fit() = 0;
 
   /**
    * Prototype for model inference
    */
-  virtual vector<vector<double>>
-  predict(const vector<vector<double>> &test_features) = 0;
+  // virtual vector<vector<double>>
+  // predict(const vector<vector<double>> &test_features) = 0;
 
   /**
    * Convert elements of 2D array from type double to int.
@@ -101,7 +96,8 @@ public:
    */
   void
   get_confusion_matrices(const vector<vector<double>> &test_predictions_double,
-                         const vector<vector<double>> &test_labels_double);
+                         const vector<vector<double>> &test_labels_double,
+                         const vector<vector<double>> &train_labels_double);
 
   /**
    * Get root mean square error for each output variable.
@@ -112,7 +108,6 @@ public:
   /**
    * Prototype for model evaluation
    */
-  virtual void evaluate(const vector<vector<double>> &test_features,
-                        const vector<vector<double>> &test_labels) = 0;
+  virtual void evaluate() = 0;
 };
 } // namespace ml
