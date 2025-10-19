@@ -31,13 +31,12 @@ void run_model(Utilities &utils, nlohmann::json model_parameters,
   }
   TrainTestData train_test = utils.get_train_test_data(model_parameters);
   string data_path = model_parameters["data"];
-  logger->log(INFO, "Training " + model_type);
   logger->log(INFO, "Data file used was " + data_path);
-  model->fit(std::move(train_test).train_features,
-             std::move(train_test).train_labels);
+  model->set_data(std::move(train_test));
+  logger->log(INFO, "Training " + model_type);
+  model->fit();
   logger->log(INFO, "Evaluating " + model_type + " on test data");
-  model->evaluate(std::move(train_test).test_features,
-                  std::move(train_test).test_labels);
+  model->evaluate();
 }
 
 int main(int argc, char *argv[]) {
