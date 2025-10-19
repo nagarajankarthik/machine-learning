@@ -107,23 +107,19 @@ public:
   void prepare_inference_input(const vector<vector<double>> &features,
                                const vector<vector<double>> &labels);
   /**
+   * Set training and test data.
+   */
+  void set_data(TrainTestData &&train_test);
+
+  /**
    * Perform model training.
    */
-  void fit(const vector<vector<double>> &&features,
-           const vector<vector<double>> &&labels);
+  void fit();
 
   /**
    * Calculate validation loss.
    */
-  void validate(int current_epoch);
-
-  /**
-   * Perform model training and evaluation with validation data
-   * */
-  void fit_eval(const vector<vector<double>> &&train_features,
-                const vector<vector<double>> &&train_labels,
-                const vector<vector<double>> &&validation_features,
-                const vector<vector<double>> &&validation_labels);
+  shared_ptr<Tensor> validate(int current_epoch);
 
   /**
    * Perform a single training epoch
@@ -131,15 +127,19 @@ public:
   void train_epoch(int current_epoch);
 
   /**
+   * Convert predictions and labels from tensors to array
+   */
+  vector<vector<double>> get_categories(shared_ptr<Tensor> tensor);
+
+  /**
    * Perform model inference
    */
-  vector<vector<double>> predict(const vector<vector<double>> &test_features);
+  vector<vector<double>> predict();
 
   /**
    * Evaluate model using test data
    */
-  void evaluate(const vector<vector<double>> &test_features,
-                const vector<vector<double>> &test_labels);
+  void evaluate();
 };
 
 } // namespace ml

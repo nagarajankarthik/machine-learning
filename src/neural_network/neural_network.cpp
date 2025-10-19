@@ -76,9 +76,11 @@ NeuralNetwork::NeuralNetwork(nlohmann::json parameters,
       layers.push_back(layer);
     }
   }
-  nlohmann::json optimizer_type = parameters["optimizer"];
+  nlohmann::json optimizer_type = parameters["optimizer"]["type"];
   if (optimizer_type == "sgd") {
-    optimizer = make_shared<SGDOptimizer>(optimize_params, logger);
+    optimizer = make_shared<SGDOptimizer>(
+        optimize_params, logger, parameters["optimizer"]["learning_rate"],
+        parameters["optimizer"]["momentum"]);
   } else {
     logger->log(WARNING,
                 "Unknown optimizer type: " + to_string(optimizer_type));
@@ -103,6 +105,8 @@ void NeuralNetwork::prepare_inference_input(
   for (int i = 0; i < features.size(); i++) {
     for (int j = 0; j < features[0].size(); j++) {
       input_values[i * features[0].size() + j] = features[i][j];
+    }
+    for (int j = 0; j < labels[0].size(); j++) {
       label_values[i * labels[0].size() + j] = labels[i][j];
     }
   }
@@ -137,6 +141,8 @@ void NeuralNetwork::prepare_train_input(const vector<vector<double>> &features,
   for (int i = 0; i < first_batch_size; i++) {
     for (int j = 0; j < number_features; j++) {
       first_batch_input[i * number_features + j] = features[i][j];
+    }
+    for (int j = 0; j < number_outputs; j++) {
       first_batch_labels[i * number_outputs + j] = labels[i][j];
     }
   }
@@ -144,6 +150,8 @@ void NeuralNetwork::prepare_train_input(const vector<vector<double>> &features,
   vector<int> first_labels_shape(labels_shape.begin(), labels_shape.end());
   first_input_shape[0] = first_batch_size;
   first_labels_shape[0] = first_batch_size;
+  shared_ptr<Tensor> test_tensor =
+      make_shared<Tensor>(vector<double>(4, 0.), vector<int>(2, 2), logger);
   shared_ptr<Tensor> first_input_tensor =
       make_shared<Tensor>(first_batch_input, first_input_shape, logger);
   shared_ptr<Tensor> first_labels_tensor =
@@ -156,9 +164,12 @@ void NeuralNetwork::prepare_train_input(const vector<vector<double>> &features,
     vector<double> batch_input(batch_size * number_features, 0.0);
     vector<double> batch_labels(batch_size * number_outputs, 0.0);
     for (int j = 0; j < batch_size; j++) {
+      int ind = first_batch_size + (i - 1) * batch_size + j;
       for (int k = 0; k < number_features; k++) {
-        batch_input[j * number_features + k] = features[i * batch_size + j][k];
-        batch_labels[j * number_outputs + k] = labels[i * batch_size + j][k];
+        batch_input[j * number_features + k] = features[ind][k];
+      }
+      for (int k = 0; k < number_outputs; k++) {
+        batch_labels[j * number_outputs + k] = labels[ind][k];
       }
     }
     shared_ptr<Tensor> input_tensor =
@@ -168,6 +179,11 @@ void NeuralNetwork::prepare_train_input(const vector<vector<double>> &features,
     train_inputs.push_back(input_tensor);
     train_labels.push_back(labels_tensor);
   }
+}
+
+void NeuralNetwork::set_data(TrainTestData &&train_test) {
+  prepare_train_input(train_test.train_features, train_test.train_labels);
+  prepare_inference_input(train_test.test_features, train_test.test_labels);
 }
 
 void NeuralNetwork::train_epoch(int current_epoch) {
@@ -182,16 +198,21 @@ void NeuralNetwork::train_epoch(int current_epoch) {
       forward_params.input = current_value;
     }
     loss = loss_function(current_value, train_labels[i]);
-    logger->log(INFO, "Loss values at epoch " + to_string(current_epoch));
+    double total_loss = 0.0;
     for (int i = 0; i < loss->values.size(); i++) {
-      logger->log(INFO, to_string(loss->values[i]));
+      if (loss->values[i] < 0.0)
+        logger->log(ERROR, to_string(i) + ": " + to_string(loss->values[i]));
+      total_loss += loss->values[i];
     }
+    logger->log(INFO, "Training loss at epoch " + to_string(current_epoch) +
+                          " and batch " + to_string(i + 1) + ": " +
+                          to_string(total_loss));
     loss->backward();
     optimizer->step();
   }
 }
 
-void NeuralNetwork::validate(int current_epoch) {
+shared_ptr<Tensor> NeuralNetwork::validate(int current_epoch) {
   shared_ptr<Tensor> current_value = inference_inputs;
   shared_ptr<Tensor> loss = nullptr;
   ForwardParams forward_params{current_value, false};
@@ -201,36 +222,28 @@ void NeuralNetwork::validate(int current_epoch) {
     forward_params.input = current_value;
   }
   loss = loss_function(current_value, inference_labels);
-  logger->log(INFO,
-              "Validation loss values at epoch " + to_string(current_epoch));
+  double total_loss = 0.0;
   for (int i = 0; i < loss->values.size(); i++) {
-    logger->log(INFO, to_string(loss->values[i]));
+    if (loss->values[i] < 0.0)
+      logger->log(ERROR, to_string(i) + ": " + to_string(loss->values[i]));
+    total_loss += loss->values[i];
+    // logger->log(INFO, to_string(loss->values[i]));
   }
+  logger->log(INFO, "Validation loss at epoch " + to_string(current_epoch) +
+                        ": " + to_string(total_loss));
+  return current_value;
 }
 
-void NeuralNetwork::fit_eval(const vector<vector<double>> &&train_features,
-                             const vector<vector<double>> &&train_labels,
-                             const vector<vector<double>> &&validation_features,
-                             const vector<vector<double>> &&validation_labels) {
-  prepare_train_input(train_features, train_labels);
-  prepare_inference_input(validation_features, validation_labels);
+void NeuralNetwork::fit() {
   for (int i = 0; i < number_epochs; i++) {
-    train_epoch(i);
-    validate(i);
-  }
-}
-void NeuralNetwork::fit(const vector<vector<double>> &&features,
-                        const vector<vector<double>> &&labels) {
-  prepare_train_input(features, labels);
-  for (int i = 0; i < number_epochs; i++) {
-    train_epoch(i);
+    train_epoch(i + 1);
+    validate(i + 1);
   }
 }
 
 // TODO: Currently included as a placeholder to enable compilation.
 vector<vector<double>>
-NeuralNetwork::predict(const vector<vector<double>> &features) {
-  prepare_inference_input(features, vector<vector<double>>());
+NeuralNetwork::predict() {
   shared_ptr<Tensor> current_value = nullptr;
   shared_ptr<Tensor> loss = nullptr;
   ForwardParams forward_params{inference_inputs, false};
@@ -243,9 +256,34 @@ NeuralNetwork::predict(const vector<vector<double>> &features) {
   return predictions;
 }
 
-void NeuralNetwork::evaluate(const vector<vector<double>> &features,
-                             const vector<vector<double>> &labels) {
-  prepare_inference_input(features, labels);
-  validate(0);
+// TODO: Add support for predicting multiple output categories
+vector<vector<double>>
+NeuralNetwork::get_categories(shared_ptr<Tensor> tensor) {
+  vector<vector<double>> categories(tensor->shape[0], vector<double>(1, 0.));
+  int number_outputs = tensor->shape[tensor->shape.size() - 1];
+  for (int i = 0; i < tensor->values.size(); i += number_outputs) {
+    double max_value = -1.0;
+    int predicted_category = 0;
+
+    for (int j = i; j < i + number_outputs; j++) {
+      if (tensor->values[j] > max_value) {
+        max_value = tensor->values[j];
+        predicted_category = j - i;
+      }
+    }
+    int index = i / number_outputs;
+    categories[index][0] = 1. * predicted_category;
+  }
+  return categories;
+}
+
+void NeuralNetwork::evaluate() {
+  shared_ptr<Tensor> predicted_tensor = validate(number_epochs);
+  vector<vector<double>> predictions_categories =
+      get_categories(predicted_tensor);
+  vector<vector<double>> actual_categories = get_categories(inference_labels);
+  // TODO: Consider including the actual training labels for the last argument
+  get_confusion_matrices(predictions_categories, actual_categories,
+                         actual_categories);
 }
 } // namespace ml
