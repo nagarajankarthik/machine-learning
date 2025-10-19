@@ -85,6 +85,28 @@ public:
    */
   vector<double> feature_importances{};
 
+  // Train and test data
+
+  /**
+   * Training features
+   */
+  vector<vector<double>> train_features{};
+
+  /**
+   * Training labels
+   */
+  vector<vector<double>> train_labels{};
+
+  /**
+   * Test features
+   */
+  vector<vector<double>> test_features{};
+
+  /**
+   * Test labels
+   */
+  vector<vector<double>> test_labels{};
+
   /**
    * Pointer to tree root
    */
@@ -100,6 +122,11 @@ public:
    * Destructor
    */
   ~DecisionTreeClassifier() {};
+
+  /**
+   * Initialize data
+   */
+  void set_data(TrainTestData &&train_test);
 
   /**
    * Compile number of occurrences of each unique class for each output
@@ -137,12 +164,12 @@ public:
    * Grow a decision tree using the recursive partitioning algorithm.
    * Calls either depth_first_search or breadth_first_search.
    */
-  void fit(const vector<vector<double>> &&features,
-           const vector<vector<double>> &&labels);
+  void fit();
+
   /**
    * Perform inference using decision tree grown by call to fit method.
    */
-  vector<vector<double>> predict(const vector<vector<double>> &test_features);
+  vector<vector<double>> predict();
 
   /**
    * Log characteristics of decision tree after training.
@@ -152,8 +179,7 @@ public:
   /**
    * Evaluate model performance on test data
    */
-  void evaluate(const vector<vector<double>> &test_features,
-                const vector<vector<double>> &test_labels);
+  void evaluate();
 };
 
 } // namespace ml
