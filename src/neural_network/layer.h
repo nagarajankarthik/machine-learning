@@ -2,6 +2,7 @@
 #include "../tensor/tensor_operations.h"
 #include "../utils/logging.h"
 #include <cassert>
+#include <cmath>
 #include <random>
 #include <variant>
 using namespace std;
