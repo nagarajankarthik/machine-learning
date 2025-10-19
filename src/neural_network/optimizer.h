@@ -46,13 +46,13 @@ public:
 class SGDOptimizer : public Optimizer {
 public:
   // Learning rate
-  double learning_rate = 0.01;
+  double learning_rate = 0.001;
 
   // Momentum
   double momentum = 0.9;
 
   SGDOptimizer(vector<shared_ptr<Tensor>> optimize_parameters,
-               shared_ptr<Logger> logger, double learning_rate = 0.01,
+               shared_ptr<Logger> logger, double learning_rate = 0.001,
                double momentum = 0.9)
       : Optimizer(optimize_parameters, logger), learning_rate(learning_rate),
         momentum(momentum) {}
