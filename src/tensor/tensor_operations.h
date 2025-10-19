@@ -1,3 +1,4 @@
+#include "../utils/logging.h"
 #include "tensor.h"
 #include <cassert>
 #include <math.h>
@@ -1707,22 +1708,30 @@ inline void max_pool_backward(shared_ptr<Tensor> t3, int kernel_height,
   if (!t1)
     return;
 
+  // The result of the forward pass through the max pool operation
+  // might have been reshaped in place before this function is called
+  // during the backward pass. Therefore, the values of height_output and
+  // width_output cannot be determined from t3_shape.
   vector<int> t1_shape = t1->shape;
-  vector<int> t3_shape = t3->shape;
   int batch_size = t1_shape[0];
   int channels = t1_shape[3];
-  int height_output = t3_shape[1];
-  int width_output = t3_shape[2];
   int height_input = t1_shape[1];
   int width_input = t1_shape[2];
   int dilated_kernel_height = 1 + dilation_kernel * (kernel_height - 1);
   int dilated_kernel_width = 1 + dilation_kernel * (kernel_width - 1);
 
+  int width_output =
+      1 + (width_input + 2 * padding - dilated_kernel_width) / stride;
+  int height_output =
+      1 + (height_input + 2 * padding - dilated_kernel_height) / stride;
+
   for (int b = 0; b < batch_size; b++) {
     for (int c = 0; c < channels; c++) {
       for (int j = 0; j < height_output; j++) {
         for (int i = 0; i < width_output; i++) {
-          double max_value = t3->get_element({b, j, i, c});
+          int offset = b * height_output * width_output * channels +
+                       j * width_output * channels + i * channels + c;
+          double max_value = t3->values.at(offset);
           int row_start = j * stride;
           int col_start = i * stride;
           for (int l = row_start; l < row_start + dilated_kernel_height;
@@ -1735,8 +1744,7 @@ inline void max_pool_backward(shared_ptr<Tensor> t3, int kernel_height,
               if (fabs(t1->get_element({b, l - padding, k - padding, c}) -
                        max_value) < std::numeric_limits<double>::epsilon()) {
                 t1->set_element(vector<int>{b, l - padding, k - padding, c},
-                                t3->get_element({b, j, i, c}, "gradients"),
-                                "gradients");
+                                t3->gradients.at(offset), "gradients");
                 goto end_loop;
               }
             }
@@ -1835,16 +1843,22 @@ inline void average_pool_backward(shared_ptr<Tensor> t3, int kernel_height,
     exit(1);
   }
 
+  // The result of the forward pass through the average pool operation
+  // might have been reshaped in place before this function is called
+  // during the backward pass. Therefore, the values of height_output and
+  // width_output cannot be determined from t3_shape.
   vector<int> t1_shape = t1->shape;
-  vector<int> t3_shape = t3->shape;
   int batch_size = t1_shape[0];
   int channels = t1_shape[3];
-  int height_output = t3_shape[1];
-  int width_output = t3_shape[2];
   int height_input = t1_shape[1];
   int width_input = t1_shape[2];
   int dilated_kernel_height = 1 + dilation_kernel * (kernel_height - 1);
   int dilated_kernel_width = 1 + dilation_kernel * (kernel_width - 1);
+
+  int width_output =
+      1 + (width_input + 2 * padding - dilated_kernel_width) / stride;
+  int height_output =
+      1 + (height_input + 2 * padding - dilated_kernel_height) / stride;
 
   for (int b = 0; b < batch_size; b++) {
     for (int c = 0; c < channels; c++) {
@@ -1864,8 +1878,7 @@ inline void average_pool_backward(shared_ptr<Tensor> t3, int kernel_height,
                 continue;
               number_average = count_values[offset];
               t1->set_element(vector<int>{b, l - padding, k - padding, c},
-                              t3->get_element({b, j, i, c}, "gradients") /
-                                  number_average,
+                              t3->gradients.at(offset) / number_average,
                               "gradients");
             }
           }
