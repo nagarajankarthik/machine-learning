@@ -1110,7 +1110,7 @@ inline void recurse_softmax_backward(const shared_ptr<Tensor> t3,
     vector<vector<double>> g1(g3.size(), vector<double>(g3[0].size(), 0.));
     for (int j = 0; j < g1[0].size(); j++) {
       for (int i = 0; i < g1.size(); i++) {
-        g1[i][j] = m3[i][j] * (g3[i][j] - gradient_values_product_sum[j]);
+        g1[i][j] = m3[i][j] * (g3[i][j] - gradient_values_product_sum[i]);
       }
     }
     t1->set_matrix(new_position, g1, "gradients");
