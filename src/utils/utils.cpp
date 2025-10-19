@@ -44,6 +44,22 @@ void Utilities::train_test_split(const vector<vector<double>> &features,
   }
 }
 
+void Utilities::one_hot_encoding(vector<vector<double>> &data) {
+
+  double max_category = -1.;
+
+  for (int i = 0; i < data.size(); i++) {
+    max_category = max(data[i][0], max_category);
+  }
+  vector<double> tmp(max_category + 1, 0.);
+  vector<vector<double>> one_hot_data(data.size(), tmp);
+  for (int i = 0; i < data.size(); i++) {
+    int ind = (int)data[i][0];
+    one_hot_data[i][ind] = 1;
+  }
+  swap(data, one_hot_data);
+}
+
 TrainTestData Utilities::get_train_test_data(nlohmann::json model_parameters) {
 
   TrainTestData train_test{};
@@ -67,6 +83,10 @@ TrainTestData Utilities::get_train_test_data(nlohmann::json model_parameters) {
     read_data(train_data_path, train_test.train_features,
               train_test.train_labels);
     read_data(test_data_path, train_test.test_features, train_test.test_labels);
+  }
+  if (model_parameters.contains("one_hot_labels")) {
+    one_hot_encoding(train_test.train_labels);
+    one_hot_encoding(train_test.test_labels);
   }
   return train_test;
 }

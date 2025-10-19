@@ -4,7 +4,7 @@
 #include <random>
 #include <string>
 #include <vector>
-
+#pragma once
 using namespace std;
 
 namespace ml {
@@ -75,6 +75,7 @@ public:
                         const vector<vector<double>> &outputs,
                         TrainTestData &train_test);
 
+  void one_hot_encoding(vector<vector<double>> &data);
   /**
    * Read data from input file and split it into training and test sets.
    */
