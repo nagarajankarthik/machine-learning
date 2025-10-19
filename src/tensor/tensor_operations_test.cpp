@@ -1186,7 +1186,7 @@ TEST_F(TensorOpsTest, AveragePoolTest) {
   int kernel_width = 2;
   int stride = 2;
   int padding = 1;
-  int dilation = 2;
+  int dilation = 1;
 
   int batch_size = input_tensor->shape[0];
   int height_input = input_tensor->shape[1];
