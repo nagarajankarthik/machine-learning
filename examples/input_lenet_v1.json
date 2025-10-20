@@ -1,0 +1,94 @@
+{
+    "general": {
+        "logfile": "logs.txt"
+    },
+    "models": [
+        {
+			"model": "neural_network",
+            "train_ratio": 0.8,
+			"train_data": "/mnt/c/Users/65915/example_datasets/mnist_train_processed.csv",
+            "test_data": "/mnt/c/Users/65915/example_datasets/mnist_test_processed.csv",
+            "one_hot_labels": "true",
+            "batch_size": 100,
+            "number_epochs": 5,
+            "input_shape": [100, 28, 28, 1],
+            "labels_shape": [100, 1, 10],
+            "layers": [ 
+                {
+                    "type": "convolution",
+                    "input_channels": 1,
+                    "output_channels": 6,
+                    "kernel_height": 5,
+                    "kernel_width": 5,
+                    "stride": 1,
+                    "padding": 2,
+                    "dilation_kernel": 1,
+                    "init_method": "pytorch",
+                    "activation": "tanh"
+                },
+                {
+                    "type": "pooling",
+                    "kernel_height": 2,
+                    "kernel_width": 2,
+                    "stride": 2,
+                    "padding": 0,
+                    "dilation_kernel": 1,
+                    "pooling_type": "average"
+                },
+                {
+                    "type": "convolution",
+                    "input_channels": 6,
+                    "output_channels": 16,
+                    "kernel_height": 5,
+                    "kernel_width": 5,
+                    "stride": 1,
+                    "padding": 0,
+                    "dilation_kernel": 1,
+                    "init_method": "pytorch",
+                    "activation": "relu"
+                },
+                {
+                    "type": "pooling",
+                    "kernel_height": 2,
+                    "kernel_width": 2,
+                    "stride": 2,
+                    "padding": 0,
+                    "dilation_kernel": 1,
+                    "pooling_type": "average"
+                },
+                {
+                    "type": "reshape",
+                    "target_shape": [100, 1, 400]
+                },
+                {
+                    "type": "fully_connected",
+                    "number_inputs": 400,
+                    "number_outputs": 120,
+                    "activation": "tanh",
+                    "init_method": "pytorch"
+                },
+                {
+                    "type": "fully_connected",
+                    "number_inputs": 120,
+                    "number_outputs": 84,
+                    "activation": "tanh",
+                    "init_method": "pytorch"
+                },
+                {
+                    "type": "fully_connected",
+                    "number_inputs": 84,
+                    "number_outputs": 10,
+                    "activation": "softmax",
+                    "init_method": "pytorch"
+                }
+            ],
+			"random_seed": 1234,
+            "optimizer": {
+                "type":"sgd",
+                "learning_rate": 0.01,
+                "momentum": 0.9
+            },
+            "loss": "cross_entropy"
+		}
+    ]
+}
