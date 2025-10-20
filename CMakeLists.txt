@@ -29,7 +29,9 @@ set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
 # add subdirectories
 add_subdirectory(src)
-add_subdirectory(docs)
+if(BUILD_DOCS)
+  add_subdirectory(docs)
+endif()
 
 # add executables
 
