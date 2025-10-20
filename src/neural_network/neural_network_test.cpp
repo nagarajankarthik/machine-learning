@@ -58,17 +58,19 @@ TEST_F(NeuralNetworkTest, ProfilingTest) {
   nn.fit();
   
   // Check that profiling statistics were collected
-  EXPECT_GT(nn.forward_pass_count, 0);
-  EXPECT_GT(nn.backward_pass_count, 0);
-  EXPECT_GT(nn.total_forward_time_ms, 0.0);
-  EXPECT_GT(nn.total_backward_time_ms, 0.0);
+  EXPECT_GT(nn.get_forward_pass_count(), 0);
+  EXPECT_GT(nn.get_backward_pass_count(), 0);
+  EXPECT_GT(nn.get_total_forward_time_ms(), 0.0);
+  EXPECT_GT(nn.get_total_backward_time_ms(), 0.0);
   
   // Check that the number of forward and backward passes match
-  EXPECT_EQ(nn.forward_pass_count, nn.backward_pass_count);
+  EXPECT_EQ(nn.get_forward_pass_count(), nn.get_backward_pass_count());
   
-  // Check that we have the expected number of passes (batches * epochs)
-  int expected_passes = 1 * 2;  // 1 batch * 2 epochs
-  EXPECT_EQ(nn.forward_pass_count, expected_passes);
+  // Check that we have the expected number of passes
+  // With 2 training examples and batch_size=2, we have 1 batch per epoch
+  // Over 2 epochs, that's 1 batch/epoch * 2 epochs = 2 total passes
+  int expected_passes = 2;  // 1 batch/epoch * 2 epochs
+  EXPECT_EQ(nn.get_forward_pass_count(), expected_passes);
   
   logger->log(INFO, "Test passed - profiling statistics collected successfully");
 }
