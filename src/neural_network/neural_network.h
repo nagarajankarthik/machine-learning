@@ -2,6 +2,7 @@
 #include "layer.h"
 #include "optimizer.h"
 
+#include <chrono>
 #include <memory>
 #include <omp.h>
 #include <random>
@@ -140,6 +141,44 @@ public:
    * Evaluate model using test data
    */
   void evaluate();
+
+  /**
+   * Print profiling statistics for forward and backward passes
+   */
+  void print_profiling_stats();
+
+  /**
+   * Get forward pass count
+   */
+  int get_forward_pass_count() const { return forward_pass_count; }
+
+  /**
+   * Get backward pass count
+   */
+  int get_backward_pass_count() const { return backward_pass_count; }
+
+  /**
+   * Get total forward pass time in milliseconds
+   */
+  double get_total_forward_time_ms() const { return total_forward_time_ms; }
+
+  /**
+   * Get total backward pass time in milliseconds
+   */
+  double get_total_backward_time_ms() const { return total_backward_time_ms; }
+
+private:
+  /**
+   * Profiling statistics for forward pass (in milliseconds)
+   */
+  double total_forward_time_ms = 0.0;
+  int forward_pass_count = 0;
+
+  /**
+   * Profiling statistics for backward pass (in milliseconds)
+   */
+  double total_backward_time_ms = 0.0;
+  int backward_pass_count = 0;
 };
 
 } // namespace ml

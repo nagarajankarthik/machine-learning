@@ -192,11 +192,19 @@ void NeuralNetwork::train_epoch(int current_epoch) {
   for (int i = 0; i < train_inputs.size(); i++) {
     optimizer->zero_gradients();
     current_value = train_inputs[i];
+    
+    // Profile forward pass
+    auto forward_start = std::chrono::high_resolution_clock::now();
     ForwardParams forward_params{current_value, true};
     for (auto &layer : layers) {
       current_value = layer->forward(forward_params);
       forward_params.input = current_value;
     }
+    auto forward_end = std::chrono::high_resolution_clock::now();
+    auto forward_duration = std::chrono::duration_cast<std::chrono::microseconds>(forward_end - forward_start);
+    total_forward_time_ms += forward_duration.count() / 1000.0;
+    forward_pass_count++;
+    
     loss = loss_function(current_value, train_labels[i]);
     double total_loss = 0.0;
     for (int i = 0; i < loss->values.size(); i++) {
@@ -207,7 +215,15 @@ void NeuralNetwork::train_epoch(int current_epoch) {
     logger->log(INFO, "Training loss at epoch " + to_string(current_epoch) +
                           " and batch " + to_string(i + 1) + ": " +
                           to_string(total_loss));
+    
+    // Profile backward pass
+    auto backward_start = std::chrono::high_resolution_clock::now();
     loss->backward();
+    auto backward_end = std::chrono::high_resolution_clock::now();
+    auto backward_duration = std::chrono::duration_cast<std::chrono::microseconds>(backward_end - backward_start);
+    total_backward_time_ms += backward_duration.count() / 1000.0;
+    backward_pass_count++;
+    
     optimizer->step();
   }
 }
@@ -239,6 +255,7 @@ void NeuralNetwork::fit() {
     train_epoch(i + 1);
     validate(i + 1);
   }
+  print_profiling_stats();
 }
 
 // TODO: Currently included as a placeholder to enable compilation.
@@ -285,5 +302,36 @@ void NeuralNetwork::evaluate() {
   // TODO: Consider including the actual training labels for the last argument
   get_confusion_matrices(predictions_categories, actual_categories,
                          actual_categories);
+}
+
+void NeuralNetwork::print_profiling_stats() {
+  logger->log(INFO, "=== Profiling Statistics ===");
+  
+  if (forward_pass_count > 0) {
+    double avg_forward_time = total_forward_time_ms / forward_pass_count;
+    logger->log(INFO, "Forward pass:");
+    logger->log(INFO, "  Total time: " + to_string(total_forward_time_ms) + " ms");
+    logger->log(INFO, "  Number of passes: " + to_string(forward_pass_count));
+    logger->log(INFO, "  Average time per pass: " + to_string(avg_forward_time) + " ms");
+  }
+  
+  if (backward_pass_count > 0) {
+    double avg_backward_time = total_backward_time_ms / backward_pass_count;
+    logger->log(INFO, "Backward pass:");
+    logger->log(INFO, "  Total time: " + to_string(total_backward_time_ms) + " ms");
+    logger->log(INFO, "  Number of passes: " + to_string(backward_pass_count));
+    logger->log(INFO, "  Average time per pass: " + to_string(avg_backward_time) + " ms");
+  }
+  
+  if (forward_pass_count > 0 && backward_pass_count > 0) {
+    double total_time = total_forward_time_ms + total_backward_time_ms;
+    double forward_percentage = (total_forward_time_ms / total_time) * 100.0;
+    double backward_percentage = (total_backward_time_ms / total_time) * 100.0;
+    logger->log(INFO, "Total training time: " + to_string(total_time) + " ms");
+    logger->log(INFO, "Forward pass percentage: " + to_string(forward_percentage) + "%");
+    logger->log(INFO, "Backward pass percentage: " + to_string(backward_percentage) + "%");
+  }
+  
+  logger->log(INFO, "============================");
 }
 } // namespace ml
