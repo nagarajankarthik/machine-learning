@@ -3,6 +3,7 @@
 #include <cassert>
 #include <math.h>
 #include <numeric>
+#include <vector>
 #pragma once
 using namespace std;
 
@@ -1553,27 +1554,29 @@ inline vector<double>
 get_values_at_index(int batch, int width_start, int height_start,
                     shared_ptr<Tensor> input, int dilated_kernel_height,
                     int dilated_kernel_width, int padding, int dilation_input) {
-  vector<double> values{};
   int height_input = input->shape[1];
   int width_input = input->shape[2];
-  shared_ptr<Logger> logger = input->logger;
+  int channels = input->shape[3];
+  vector<double> values(dilated_kernel_height * dilated_kernel_width * channels,
+                        0.);
+  int index = 0;
 
   for (int l = height_start; l < height_start + dilated_kernel_height; l++) {
     for (int k = width_start; k < width_start + dilated_kernel_width; k++) {
-      for (int p = 0; p < input->shape[3]; p++) {
-        if (k < padding || l < padding ||
-            k > padding + (width_input - 1) * dilation_input ||
-            l > padding + (height_input - 1) * dilation_input)
-          values.push_back(0);
-
-        else if ((l - padding) % dilation_input != 0 ||
-                 (k - padding) % dilation_input != 0)
-          values.push_back(0);
-        else {
-          int i = (l - padding) / dilation_input;
-          int j = (k - padding) / dilation_input;
-          vector<int> required_index = {batch, i, j, p};
-          values.push_back(input->get_element(required_index));
+      if (k < padding || l < padding ||
+          k > padding + (width_input - 1) * dilation_input ||
+          l > padding + (height_input - 1) * dilation_input) {
+        index += channels;
+      } else if ((l - padding) % dilation_input != 0 ||
+                 (k - padding) % dilation_input != 0) {
+        index += channels;
+      } else {
+        int i = (l - padding) / dilation_input;
+        int j = (k - padding) / dilation_input;
+        int start_index = batch * height_input * width_input * channels +
+                          i * width_input * channels + j * channels;
+        for (int p = 0; p < channels; p++) {
+          values[index++] = input->values[start_index + p];
         }
       }
     }
