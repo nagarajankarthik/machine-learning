@@ -2,6 +2,7 @@
 #include "layer.h"
 #include "optimizer.h"
 
+#include <chrono>
 #include <memory>
 #include <omp.h>
 #include <random>
@@ -13,6 +14,17 @@ namespace ml {
 
 class NeuralNetwork : public BaseModel {
 public:
+  /**
+   * Profiling statistics for forward pass (in milliseconds)
+   */
+  double total_forward_time_ms = 0.0;
+  int forward_pass_count = 0;
+
+  /**
+   * Profiling statistics for backward pass (in milliseconds)
+   */
+  double total_backward_time_ms = 0.0;
+  int backward_pass_count = 0;
   /**
    * Shape of input tensor for a single mini-batch. First element should be
    * equal to batch size.
@@ -140,6 +152,11 @@ public:
    * Evaluate model using test data
    */
   void evaluate();
+
+  /**
+   * Print profiling statistics for forward and backward passes
+   */
+  void print_profiling_stats();
 };
 
 } // namespace ml
