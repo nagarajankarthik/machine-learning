@@ -1863,23 +1863,23 @@ inline void average_pool_backward(shared_ptr<Tensor> t3, int kernel_height,
   int height_output =
       1 + (height_input + 2 * padding - dilated_kernel_height) / stride;
 
-  for (int b = 0; b < batch_size; b++) {
-    for (int c = 0; c < channels; c++) {
-      for (int j = 0; j < height_output; j++) {
-        for (int i = 0; i < width_output; i++) {
-          int offset = b * height_output * width_output * channels +
-                       j * width_output * channels + i * channels + c;
-          int row_start = j * stride;
-          int col_start = i * stride;
-          int number_average = 0;
-          for (int l = row_start; l < row_start + dilated_kernel_height;
-               l += dilation_kernel) {
-            for (int k = col_start; k < col_start + dilated_kernel_width;
-                 k += dilation_kernel) {
-              if (k < padding || l < padding || k > padding + width_input - 1 ||
-                  l > padding + height_input - 1)
-                continue;
-              number_average = count_values[offset];
+  for (int b = 0; b < batch_size; ++b) {
+    for (int j = 0; j < height_output; ++j) {
+      for (int i = 0; i < width_output; ++i) {
+        int base_offset = b * height_output * width_output * channels +
+                          j * width_output * channels + i * channels;
+        int row_start = j * stride;
+        int col_start = i * stride;
+        for (int l = row_start; l < row_start + dilated_kernel_height;
+             l += dilation_kernel) {
+          for (int k = col_start; k < col_start + dilated_kernel_width;
+               k += dilation_kernel) {
+            if (k < padding || l < padding || k > padding + width_input - 1 ||
+                l > padding + height_input - 1)
+              continue;
+            for (int c = 0; c < channels; ++c) {
+              int offset = base_offset + c;
+              int number_average = count_values[offset];
               t1->set_element(vector<int>{b, l - padding, k - padding, c},
                               t3->gradients.at(offset) / number_average,
                               "gradients");
