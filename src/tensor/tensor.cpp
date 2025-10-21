@@ -1,4 +1,5 @@
 #include "tensor.h"
+#include <cassert>
 
 namespace ml {
 Tensor::Tensor(vector<double> values, vector<int> shape,
@@ -29,37 +30,30 @@ Tensor::Tensor(vector<double> values, vector<int> shape,
 };
 
 vector<int> Tensor::broadcast_indices(vector<int> position, int offset) const {
-  list<int> position_list(position.begin(), position.end());
-  while (position_list.size() > shape.size() - offset) {
-    position_list.pop_front();
-  }
-  vector<int> new_position(position_list.begin(), position_list.end());
-
-  if (new_position.size() != shape.size() - offset) {
-    logger->log(ERROR, "The specified position has " +
-                           to_string(new_position.size()) +
-                           " indices, but the tensor has " +
-                           to_string(shape.size()) + " dimensions");
-    exit(1);
-  }
-
-  for (int i = 0; i < new_position.size(); i++) {
-    if (new_position[i] >= shape[i]) {
-      if (shape[i] == 1) {
-        new_position[i] = 0;
+  vector<int> new_position(shape.size() - offset, -1);
+  int position_index = position.size() - 1;
+  int shape_index = shape.size() - 1 - offset;
+  int new_position_index = new_position.size() - 1;
+  while (shape_index > -1) {
+    new_position[new_position_index] = position[position_index];
+    if (position[position_index] >= shape[shape_index]) {
+      if (shape[shape_index] == 1) {
+        new_position[new_position_index] = 0;
       } else {
         logger->log(ERROR, " Invalid index in "
                            "broadcast_indices at dimension " +
-                               to_string(i) + ".");
+                               to_string(shape_index) + ".");
         logger->log(ERROR, " Attempted to access index " +
-                               to_string(new_position[i]) +
-                               " but the tensor has " + to_string(shape[i]) +
-                               " entries.");
+                               to_string(position[position_index]) +
+                               " but the tensor has " +
+                               to_string(shape[shape_index]) + " entries.");
         exit(1);
       }
     }
+    new_position_index--;
+    position_index--;
+    shape_index--;
   }
-
   return new_position;
 }
 
