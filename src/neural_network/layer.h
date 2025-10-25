@@ -260,7 +260,9 @@ public:
   shared_ptr<Tensor> forward(ForwardParams forward_params) override {
     shared_ptr<Tensor> input = forward_params.input;
     return _activation_functions[activation](
-        convolution(input, weights, bias, stride, padding, 1, dilation_kernel));
+        convolution(input, weights, bias, stride, padding, 1, dilation_kernel,
+                    0, input->shape[0] - 1, 0, weights->shape[0] - 1, 0,
+                    input->shape[3] - 1, 0, weights->shape[3] - 1));
   }
 };
 
