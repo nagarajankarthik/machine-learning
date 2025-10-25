@@ -753,8 +753,8 @@ TEST_F(TensorOpsTest, GetValuesIndexTest) {
 
   // Get values at index for dilation_input = 1, padding = 0
   logger->log(INFO, "Get values at index for dilation_input = 1, padding = 0");
-  vector<double> values =
-      get_values_at_index(0, 1, 1, input_tensor, 2, 2, 0, 1);
+  vector<double> values = get_values_at_index(0, 1, 1, input_tensor, 2, 2, 0, 1,
+                                              0, input_shape[3] - 1);
   ASSERT_EQ(values.size(), 8);
   for (int i = 0; i < values.size(); i++) {
     if (i % 2) {
@@ -766,7 +766,8 @@ TEST_F(TensorOpsTest, GetValuesIndexTest) {
 
   // Get values at index for dilation_input = 2, padding = 1
   logger->log(INFO, "Get values at index for dilation_input = 2, padding = 0");
-  values = get_values_at_index(0, 1, 1, input_tensor, 2, 2, 0, 2);
+  values = get_values_at_index(0, 1, 1, input_tensor, 2, 2, 0, 2, 0,
+                               input_shape[3] - 1);
   ASSERT_EQ(values.size(), 8);
   for (int i = 0; i < 6; i++) {
     ASSERT_FLOAT_EQ(values[i], 0.);
@@ -776,7 +777,8 @@ TEST_F(TensorOpsTest, GetValuesIndexTest) {
 
   // Get values at index for dilation_input = 2, padding = 2
   logger->log(INFO, "Get values at index for dilation_input = 2, padding = 2");
-  values = get_values_at_index(0, 3, 3, input_tensor, 2, 2, 2, 2);
+  values = get_values_at_index(0, 3, 3, input_tensor, 2, 2, 2, 2, 0,
+                               input_shape[3] - 1);
   ASSERT_EQ(values.size(), 8);
   for (int i = 0; i < 6; i++) {
     ASSERT_FLOAT_EQ(values[i], 0.);
@@ -851,7 +853,8 @@ TEST_F(TensorOpsTest, ConvolutionForwardTest) {
 
   shared_ptr<Tensor> convolution_result =
       convolution(input_tensor, kernel, bias, stride, padding, dilation_input,
-                  dilation_kernel);
+                  dilation_kernel, 0, input_tensor->shape[0] - 1, 0,
+                  number_filters - 1, 0, channels - 1, 0, channels - 1);
 
   vector<int> expected_shape{batch_size, height_output, width_output,
                              number_filters};
@@ -966,9 +969,10 @@ TEST_F(TensorOpsTest, ConvolutionBackwardTest) {
   int dilation_kernel = 2;
   int dilated_kernel_height = 1 + dilation_kernel * (kernel_shape[1] - 1);
   int dilated_kernel_width = 1 + dilation_kernel * (kernel_shape[2] - 1);
-  shared_ptr<Tensor> convolution_result =
-      convolution(input_tensor, kernel, bias, stride, padding, dilation_input,
-                  dilation_kernel);
+  shared_ptr<Tensor> convolution_result = convolution(
+      input_tensor, kernel, bias, stride, padding, dilation_input,
+      dilation_kernel, 0, input_shape[0] - 1, 0, kernel_shape[0] - 1, 0,
+      input_shape[3] - 1, 0, kernel_shape[3] - 1);
   for (int i = 0; i < convolution_result->gradients.size(); i++) {
     convolution_result->gradients[i] = 1.;
   }
