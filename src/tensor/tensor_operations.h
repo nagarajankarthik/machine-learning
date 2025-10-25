@@ -1,5 +1,6 @@
 #include "../utils/logging.h"
 #include "tensor.h"
+#include <algorithm>
 #include <cassert>
 #include <math.h>
 #include <numeric>
@@ -13,24 +14,26 @@ namespace ml {
 inline vector<int> broadcast_shape(vector<int> t1_shape, vector<int> t2_shape,
                                    shared_ptr<Logger> logger,
                                    int start_index = 2) {
-  vector<int> new_shape{};
   int m = t1_shape.size();
   int n = t2_shape.size();
+  int number_elements = max(m, n);
+  vector<int> new_shape(number_elements, 0);
 
   for (int i = start_index; i < max(m, n); i++) {
     int first_index = m - 1 - i;
     int second_index = n - 1 - i;
+    int new_shape_index = number_elements - 1 - i;
     if (first_index < 0)
-      new_shape.push_back(t2_shape[second_index]);
+      new_shape[new_shape_index] = t2_shape[second_index];
     else if (second_index < 0)
-      new_shape.push_back(t1_shape[first_index]);
+      new_shape[new_shape_index] = t1_shape[first_index];
     else if (t1_shape[first_index] == t2_shape[second_index])
-      new_shape.push_back(t1_shape[first_index]);
+      new_shape[new_shape_index] = t1_shape[first_index];
     else {
       int min_size = min(t1_shape[first_index], t2_shape[second_index]);
       int max_size = max(t1_shape[first_index], t2_shape[second_index]);
       if (min_size == 1)
-        new_shape.push_back(max_size);
+        new_shape[new_shape_index] = max_size;
       else {
         logger->log(ERROR, "Size mismatch at non-singleton index " +
                                to_string(i) +
@@ -43,7 +46,6 @@ inline vector<int> broadcast_shape(vector<int> t1_shape, vector<int> t2_shape,
       }
     }
   }
-  reverse(new_shape.begin(), new_shape.end());
   return new_shape;
 }
 
@@ -159,8 +161,10 @@ inline shared_ptr<Tensor> add_batch_forward(const shared_ptr<Tensor> t1,
     exit(1);
   }
 
-  new_shape.push_back(t1->shape[m - 2]);
-  new_shape.push_back(t1->shape[n - 1]);
+  new_shape.at(max(m, n) - 2) = t1->shape[m - 2];
+  new_shape[max(m, n) - 1] = t1->shape[m - 1];
+  // new_shape.push_back(t1->shape[m - 2]);
+  // new_shape.push_back(t1->shape[n - 1]);
 
   int number_of_values = 1;
   for (int i = 0; i < new_shape.size(); i++) {
@@ -274,8 +278,10 @@ inline vector<int> get_shape_after_matmul(shared_ptr<Tensor> t1,
                            to_string(t2->shape[n - 2]));
     exit(1);
   }
-  new_shape.push_back(t1->shape[m - 2]);
-  new_shape.push_back(t2->shape[n - 1]);
+  new_shape[max(m, n) - 2] = t1->shape[m - 2];
+  new_shape[max(m, n) - 1] = t2->shape[n - 1];
+  // new_shape.push_back(t1->shape[m - 2]);
+  // new_shape.push_back(t2->shape[n - 1]);
 
   return new_shape;
 }
@@ -583,8 +589,8 @@ inline void axis_norm_backward(shared_ptr<Tensor> t3, int axis,
  * transformation after normalization
  * @param averages: Vector of means for each slice of the input
  * @param variances: Vector of variances for each slice of the input
- * @param compute_mean_variance: Boolean indicating whether to compute mean and
- * variance or use the existing values in averages and variances
+ * @param compute_mean_variance: Boolean indicating whether to compute mean
+ * and variance or use the existing values in averages and variances
  * @return: Normalized tensor having same shape as the input
  */
 inline shared_ptr<Tensor>
@@ -1485,9 +1491,9 @@ inline void convolution_backward(shared_ptr<Tensor> convolution_result,
             convolution_kernel->gradients[convolution_kernel_index] +=
                 kernel_filter_gradients->values[kernel_filter_gradients_index];
             // convolution_kernel->set_element(
-            //     vector<int>{f, j / dilation_kernel, i / dilation_kernel, c},
-            //     kernel_filter_gradients->get_element(vector<int>{0, j, i, 0}),
-            //     "gradients");
+            //     vector<int>{f, j / dilation_kernel, i / dilation_kernel,
+            //     c}, kernel_filter_gradients->get_element(vector<int>{0, j,
+            //     i, 0}), "gradients");
           }
         }
       }
