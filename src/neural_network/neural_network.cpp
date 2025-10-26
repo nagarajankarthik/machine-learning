@@ -242,8 +242,7 @@ void NeuralNetwork::fit() {
 }
 
 // TODO: Currently included as a placeholder to enable compilation.
-vector<vector<double>>
-NeuralNetwork::predict() {
+vector<vector<double>> NeuralNetwork::predict() {
   shared_ptr<Tensor> current_value = nullptr;
   shared_ptr<Tensor> loss = nullptr;
   ForwardParams forward_params{inference_inputs, false};
