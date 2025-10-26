@@ -49,143 +49,12 @@ inline vector<int> broadcast_shape(vector<int> t1_shape, vector<int> t2_shape,
   return new_shape;
 }
 
-// Add two matrices
-inline vector<vector<double>> add_matrix(vector<vector<double>> m1,
-                                         vector<vector<double>> m2,
-                                         shared_ptr<Logger> logger) {
-
-  if (m1.size() != m2.size()) {
-    logger->log(ERROR, "Error in add_matrix: First input has " +
-                           to_string(m1.size()) +
-                           " rows but second input has " +
-                           to_string(m2.size()) + " rows.");
-    exit(1);
-  }
-
-  if (m1[0].size() != m2[0].size()) {
-    logger->log(ERROR, "Error in add_matrix: First input has " +
-                           to_string(m1[0].size()) +
-                           " columns but second input has " +
-                           to_string(m2[0].size()) + " columns.");
-    exit(1);
-  }
-  vector<vector<double>> matrix_sum(m1.size(), vector<double>(m1[0].size()));
-  for (int i = 0; i < m1.size(); i++) {
-    for (int j = 0; j < m1[0].size(); j++) {
-      matrix_sum[i][j] = m1[i][j] + m2[i][j];
-    }
-  }
-  return matrix_sum;
-}
-
-inline void recurse_add_backward(shared_ptr<Tensor> t3, shared_ptr<Tensor> t1,
-                                 shared_ptr<Tensor> t2,
-                                 vector<int> new_position, int axis = 0) {
-
-  if (axis == t3->shape.size() - 2) {
-    vector<vector<double>> g3 = t3->get_matrix(new_position, "gradients");
-    t1->set_matrix(new_position, g3, "gradients");
-    t2->set_matrix(new_position, g3, "gradients");
-    return;
-  }
-
-  new_position.push_back(0);
-  int position_index = new_position.size() - 1;
-
-  for (int i = 0; i < t3->shape[axis]; i++) {
-    new_position[position_index] = i;
-    recurse_add_backward(t3, t1, t2, new_position, axis + 1);
-  }
-  new_position.pop_back();
-}
-
-inline void add_batch_backward(shared_ptr<Tensor> t3) {
-
-  shared_ptr<Tensor> t1 = t3->input_first;
-  if (!t1)
-    return;
-  shared_ptr<Tensor> t2 = t3->input_second;
-
-  shared_ptr<Logger> logger = t1->logger;
-
-  vector<int> new_position{};
-  recurse_add_backward(t3, t1, t2, new_position);
-}
-
-inline void recurse_add_forward(shared_ptr<Tensor> t3,
-                                const shared_ptr<Tensor> t1,
-                                const shared_ptr<Tensor> t2,
-                                vector<int> new_position, int axis = 0) {
-
-  if (axis == t3->shape.size() - 2) {
-    vector<vector<double>> m1 = t1->get_matrix(new_position, "values");
-    vector<vector<double>> m2 = t2->get_matrix(new_position, "values");
-    vector<vector<double>> matrix_sum = add_matrix(m1, m2, t1->logger);
-    t3->set_matrix(new_position, matrix_sum);
-    return;
-  }
-
-  new_position.push_back(0);
-  int position_index = new_position.size() - 1;
-
-  for (int i = 0; i < t3->shape[axis]; i++) {
-    new_position[position_index] = i;
-    recurse_add_forward(t3, t1, t2, new_position, axis + 1);
-  }
-  new_position.pop_back();
-}
-
-inline shared_ptr<Tensor> add_batch_forward(const shared_ptr<Tensor> t1,
-                                            const shared_ptr<Tensor> t2) {
-
-  shared_ptr<Logger> logger = t1->logger;
-  vector<int> new_shape = broadcast_shape(t1->shape, t2->shape, logger);
-  int m = t1->shape.size();
-  int n = t2->shape.size();
-
-  if (t1->shape[m - 2] != t2->shape[n - 2]) {
-    logger->log(ERROR, " Error in add_batch_forward: At the second last "
-                       "dimension, the shapes are  " +
-                           to_string(t1->shape[m - 2]) + " and " +
-                           to_string(t2->shape[n - 2]) +
-                           " for the two input tensors.");
-    exit(1);
-  }
-
-  if (t1->shape[m - 1] != t2->shape[n - 1]) {
-    logger->log(ERROR, " Error in add_batch_forward: At the last "
-                       "dimension, the shapes are  " +
-                           to_string(t1->shape[m - 1]) + " and " +
-                           to_string(t2->shape[n - 1]) +
-                           " for the two input tensors.");
-    exit(1);
-  }
-
-  new_shape.at(max(m, n) - 2) = t1->shape[m - 2];
-  new_shape[max(m, n) - 1] = t1->shape[m - 1];
-  // new_shape.push_back(t1->shape[m - 2]);
-  // new_shape.push_back(t1->shape[n - 1]);
-
-  int number_of_values = 1;
-  for (int i = 0; i < new_shape.size(); i++) {
-    number_of_values *= new_shape[i];
-  }
-
-  vector<double> sum_values(number_of_values, 0.);
-
-  shared_ptr<Tensor> t3 = make_shared<Tensor>(sum_values, new_shape, logger, t1,
-                                              t2, add_batch_backward);
-  vector<int> new_position{};
-  recurse_add_forward(t3, t1, t2, new_position);
-  return t3;
-}
-
 // Generic addition operation for two tensors unrelated to matrix addition
 
 inline void recurse_add_tensor_backward(shared_ptr<Tensor> t3,
                                         shared_ptr<Tensor> t1,
                                         shared_ptr<Tensor> t2,
-                                        vector<int> new_position,
+                                        vector<int> &new_position,
                                         int axis = 0) {
 
   if (axis == t3->shape.size()) {
@@ -195,14 +64,10 @@ inline void recurse_add_tensor_backward(shared_ptr<Tensor> t3,
     return;
   }
 
-  new_position.push_back(0);
-  int position_index = new_position.size() - 1;
-
   for (int i = 0; i < t3->shape[axis]; i++) {
-    new_position[position_index] = i;
+    new_position[axis] = i;
     recurse_add_tensor_backward(t3, t1, t2, new_position, axis + 1);
   }
-  new_position.pop_back();
 }
 
 inline void add_tensor_backward(shared_ptr<Tensor> t3) {
@@ -214,14 +79,15 @@ inline void add_tensor_backward(shared_ptr<Tensor> t3) {
 
   shared_ptr<Logger> logger = t1->logger;
 
-  vector<int> new_position{};
+  vector<int> new_position(t3->shape.size(), 0);
   recurse_add_tensor_backward(t3, t1, t2, new_position);
 }
 
 inline void recurse_add_tensor_forward(shared_ptr<Tensor> t3,
                                        const shared_ptr<Tensor> t1,
                                        const shared_ptr<Tensor> t2,
-                                       vector<int> new_position, int axis = 0) {
+                                       vector<int> &new_position,
+                                       int axis = 0) {
 
   if (axis == t3->shape.size()) {
     double v1 = t1->get_element(new_position);
@@ -230,14 +96,10 @@ inline void recurse_add_tensor_forward(shared_ptr<Tensor> t3,
     return;
   }
 
-  new_position.push_back(0);
-  int position_index = new_position.size() - 1;
-
   for (int i = 0; i < t3->shape[axis]; i++) {
-    new_position[position_index] = i;
+    new_position[axis] = i;
     recurse_add_tensor_forward(t3, t1, t2, new_position, axis + 1);
   }
-  new_position.pop_back();
 }
 
 inline shared_ptr<Tensor> add_tensor_forward(const shared_ptr<Tensor> t1,
@@ -255,7 +117,7 @@ inline shared_ptr<Tensor> add_tensor_forward(const shared_ptr<Tensor> t1,
 
   shared_ptr<Tensor> t3 = make_shared<Tensor>(sum_values, new_shape, logger, t1,
                                               t2, add_tensor_backward);
-  vector<int> new_position{};
+  vector<int> new_position(new_shape.size(), 0);
   recurse_add_tensor_forward(t3, t1, t2, new_position);
   return t3;
 }
@@ -280,8 +142,6 @@ inline vector<int> get_shape_after_matmul(shared_ptr<Tensor> t1,
   }
   new_shape[max(m, n) - 2] = t1->shape[m - 2];
   new_shape[max(m, n) - 1] = t2->shape[n - 1];
-  // new_shape.push_back(t1->shape[m - 2]);
-  // new_shape.push_back(t2->shape[n - 1]);
 
   return new_shape;
 }
@@ -339,14 +199,10 @@ inline void recurse_matmul_backward(const shared_ptr<Tensor> t3,
     return;
   }
 
-  new_position.push_back(0);
-  int position_index = new_position.size() - 1;
-
   for (int i = 0; i < t3->shape[axis]; i++) {
-    new_position[position_index] = i;
+    new_position[axis] = i;
     recurse_matmul_backward(t3, t1, t2, new_position, axis + 1);
   }
-  new_position.pop_back();
 }
 
 inline void batch_matmul_backward(shared_ptr<Tensor> t3) {
@@ -358,7 +214,7 @@ inline void batch_matmul_backward(shared_ptr<Tensor> t3) {
 
   shared_ptr<Logger> logger = t1->logger;
 
-  vector<int> new_position{};
+  vector<int> new_position(t3->shape.size() - 2, 0);
   recurse_matmul_backward(t3, t1, t2, new_position);
 }
 
@@ -375,14 +231,10 @@ inline void recurse_matmul_forward(shared_ptr<Tensor> t3,
     return;
   }
 
-  new_position.push_back(0);
-  int position_index = new_position.size() - 1;
-
   for (int i = 0; i < t3->shape[axis]; i++) {
-    new_position[position_index] = i;
+    new_position[axis] = i;
     recurse_matmul_forward(t3, t1, t2, new_position, axis + 1);
   }
-  new_position.pop_back();
 }
 
 inline shared_ptr<Tensor> batch_matmul_forward(shared_ptr<Tensor> t1,
@@ -401,7 +253,7 @@ inline shared_ptr<Tensor> batch_matmul_forward(shared_ptr<Tensor> t1,
       make_shared<Tensor>(vector<double>(new_size, 0.), new_shape, logger, t1,
                           t2, batch_matmul_backward);
 
-  vector<int> new_position{};
+  vector<int> new_position(new_shape.size() - 2, 0);
   recurse_matmul_forward(t3, t1, t2, new_position);
   return t3;
 }
@@ -692,19 +544,15 @@ inline void recurse_concatenate_backward(const shared_ptr<Tensor> t3,
     return;
   }
 
-  new_position.push_back(0);
-  int position_index = new_position.size() - 1;
-
   for (int i = 0; i < t3->shape[axis]; i++) {
-    new_position[position_index] = i;
+    new_position[axis] = i;
     if (axis == concat_dim && i >= t1->shape[axis]) {
       use_first = false;
-      new_position[position_index] = i - t1->shape[axis];
+      new_position[axis] = i - t1->shape[axis];
     }
     recurse_concatenate_backward(t3, t1, t2, new_position, axis + 1, concat_dim,
                                  use_first);
   }
-  new_position.pop_back();
 }
 
 inline void concatenate_backward(shared_ptr<Tensor> t3, int concat_dim) {
@@ -716,7 +564,7 @@ inline void concatenate_backward(shared_ptr<Tensor> t3, int concat_dim) {
 
   shared_ptr<Logger> logger = t1->logger;
 
-  vector<int> new_position{};
+  vector<int> new_position(t3->shape.size(), 0);
   recurse_concatenate_backward(t3, t1, t2, new_position, 0, concat_dim);
 }
 
@@ -740,19 +588,15 @@ inline void recurse_concatenate_forward(shared_ptr<Tensor> t3,
     return;
   }
 
-  new_position.push_back(0);
-  int position_index = new_position.size() - 1;
-
   for (int i = 0; i < t3->shape[axis]; i++) {
-    new_position[position_index] = i;
+    new_position[axis] = i;
     if (axis == concat_dim && i >= t1->shape[axis]) {
       use_first = false;
-      new_position[position_index] = i - t1->shape[axis];
+      new_position[axis] = i - t1->shape[axis];
     }
     recurse_concatenate_forward(t3, t1, t2, new_position, axis + 1, concat_dim,
                                 use_first);
   }
-  new_position.pop_back();
 }
 
 inline shared_ptr<Tensor> concatenate_forward(shared_ptr<Tensor> t1,
@@ -800,191 +644,8 @@ inline shared_ptr<Tensor> concatenate_forward(shared_ptr<Tensor> t1,
 
   shared_ptr<Tensor> t3 = make_shared<Tensor>(
       vector<double>(new_size, 0.), new_shape, logger, t1, t2, concat_back);
-  vector<int> new_position{};
+  vector<int> new_position(new_shape.size(), 0);
   recurse_concatenate_forward(t3, t1, t2, new_position, 0, concat_dim);
-  return t3;
-}
-
-inline void recurse_concatenate_backward_matrix(
-    const shared_ptr<Tensor> t3, shared_ptr<Tensor> t1, shared_ptr<Tensor> t2,
-    vector<int> &new_position, int axis = 0, int concat_dim = 0,
-    bool use_first = true) {
-
-  if (axis == t3->shape.size() - 2) {
-    vector<vector<double>> g3 = t3->get_matrix(new_position, "gradients");
-    if (concat_dim < axis) {
-      if (use_first)
-        t1->set_matrix(new_position, g3, "gradients");
-      else
-        t2->set_matrix(new_position, g3, "gradients");
-    } else if (concat_dim == axis) {
-      vector<vector<double>> g1{}, g2{};
-      g1.assign(g3.begin(), g3.begin() + t1->shape[axis]);
-      g2.assign(g3.begin() + t1->shape[axis], g3.end());
-      t1->set_matrix(new_position, g1, "gradients");
-      t2->set_matrix(new_position, g2, "gradients");
-    } else if (concat_dim == axis + 1) {
-      vector<double> tmp{};
-      vector<vector<double>> g1(t1->shape[axis], tmp), g2(t1->shape[axis], tmp);
-      for (int i = 0; i < t1->shape[axis]; i++) {
-        g1[i].assign(g3[i].begin(), g3[i].begin() + t1->shape[axis + 1]);
-        g2[i].assign(g3[i].begin() + t1->shape[axis + 1], g3[i].end());
-      }
-      t1->set_matrix(new_position, g1, "gradients");
-      t2->set_matrix(new_position, g2, "gradients");
-    }
-  }
-
-  new_position.push_back(0);
-  int position_index = new_position.size() - 1;
-
-  for (int i = 0; i < t3->shape[axis]; i++) {
-    new_position[position_index] = i;
-    if (axis == concat_dim && i >= t1->shape[axis]) {
-      use_first = false;
-      new_position[position_index] = i - t1->shape[axis];
-    }
-    recurse_concatenate_backward_matrix(t3, t1, t2, new_position, axis + 1,
-                                        concat_dim, use_first);
-  }
-  new_position.pop_back();
-}
-
-inline void concatenate_backward_matrix(shared_ptr<Tensor> t3, int concat_dim) {
-
-  shared_ptr<Tensor> t1 = t3->input_first;
-  if (!t1)
-    return;
-  shared_ptr<Tensor> t2 = t3->input_second;
-
-  shared_ptr<Logger> logger = t1->logger;
-
-  vector<int> new_position{};
-  recurse_concatenate_backward_matrix(t3, t1, t2, new_position, 0, concat_dim);
-}
-
-inline void recurse_concatenate_forward_matrix(shared_ptr<Tensor> t3,
-                                               shared_ptr<Tensor> t1,
-                                               shared_ptr<Tensor> t2,
-                                               vector<int> &new_position,
-                                               int axis = 0, int concat_dim = 0,
-                                               bool use_first = true) {
-
-  if (axis == t3->shape.size() - 2) {
-    if (concat_dim < axis) {
-      vector<vector<double>> current_matrix{}, current_gradients{};
-      if (use_first) {
-        current_matrix = t1->get_matrix(new_position, "values");
-        current_gradients = t1->get_matrix(new_position, "gradients");
-      } else {
-        current_matrix = t2->get_matrix(new_position, "values");
-        current_gradients = t2->get_matrix(new_position, "gradients");
-      }
-      vector<int> new_pos(new_position.begin(), new_position.end());
-      if (!use_first)
-        new_pos[concat_dim] += t1->shape[concat_dim];
-      t3->set_matrix(new_pos, current_matrix, "values");
-      t3->set_matrix(new_pos, current_gradients, "gradients");
-    } else if (concat_dim == axis) {
-      vector<vector<double>> first_matrix =
-          t1->get_matrix(new_position, "values");
-      vector<vector<double>> first_gradients =
-          t1->get_matrix(new_position, "gradients");
-      vector<vector<double>> second_matrix =
-          t2->get_matrix(new_position, "values");
-      vector<vector<double>> second_gradients =
-          t2->get_matrix(new_position, "gradients");
-      first_matrix.insert(first_matrix.end(), second_matrix.begin(),
-                          second_matrix.end());
-      first_gradients.insert(first_gradients.end(), second_gradients.begin(),
-                             second_gradients.end());
-      t3->set_matrix(new_position, first_matrix, "values");
-      t3->set_matrix(new_position, first_gradients, "gradients");
-    } else if (concat_dim == axis + 1) {
-      vector<vector<double>> first_matrix =
-          t1->get_matrix(new_position, "values");
-      vector<vector<double>> first_gradients =
-          t1->get_matrix(new_position, "gradients");
-      vector<vector<double>> second_matrix =
-          t2->get_matrix(new_position, "values");
-      vector<vector<double>> second_gradients =
-          t2->get_matrix(new_position, "gradients");
-      for (int i = 0; i < first_matrix.size(); i++) {
-        first_matrix[i].insert(first_matrix[i].end(), second_matrix[i].begin(),
-                               second_matrix[i].end());
-        first_gradients[i].insert(first_gradients[i].end(),
-                                  second_gradients[i].begin(),
-                                  second_gradients[i].end());
-      }
-      t3->set_matrix(new_position, first_matrix, "values");
-      t3->set_matrix(new_position, first_gradients, "gradients");
-    }
-
-    return;
-  }
-
-  new_position.push_back(0);
-  int position_index = new_position.size() - 1;
-
-  for (int i = 0; i < t3->shape[axis]; i++) {
-    new_position[position_index] = i;
-    if (axis == concat_dim && i >= t1->shape[axis]) {
-      use_first = false;
-      new_position[position_index] = i - t1->shape[axis];
-    }
-    recurse_concatenate_forward_matrix(t3, t1, t2, new_position, axis + 1,
-                                       concat_dim, use_first);
-  }
-  new_position.pop_back();
-}
-
-inline shared_ptr<Tensor> concatenate_forward_matrix(shared_ptr<Tensor> t1,
-                                                     shared_ptr<Tensor> t2,
-                                                     int concat_dim = 0) {
-  vector<int> first_shape = t1->shape;
-  vector<int> second_shape = t2->shape;
-  shared_ptr<Logger> logger = t1->logger;
-
-  if (first_shape.size() != second_shape.size()) {
-    logger->log(ERROR, "Error in concatenate_forward: Input "
-                       "Tensors have different shapes.");
-    exit(1);
-  }
-
-  for (int i = 0; i < first_shape.size(); i++) {
-    if (i != concat_dim && first_shape[i] != second_shape[i]) {
-      logger->log(ERROR, "Error in concatenate_forward: Input Tensors have "
-                         "different shapes along dimension " +
-                             to_string(i) + ".");
-      logger->log(ERROR,
-                  "Concatenation dimension is " + to_string(concat_dim) + ".");
-      exit(1);
-    }
-  }
-
-  vector<int> new_shape = first_shape;
-  new_shape[concat_dim] += second_shape[concat_dim];
-  int new_size = t1->values.size() + t2->values.size();
-  /**
-   * See
-   * https://stackoverflow.com/questions/30217956/error-variable-cannot-be-implicitly-captured-because-no-default-capture-mode-h
-   * https://stackoverflow.com/questions/55124517/stdfunction-and-stdbind-return-value
-   * As explained in the second of the two links above, the next 3 lines
-   * of code are commented out because the lambda function method is
-   * preferred over the std::bind method
-   */
-
-  // std::function<void(shared_ptr<Tensor>)> concat_back =
-  //     std::bind(concatenate_backward, std::placeholders::_1,
-  //     concat_dim);
-  auto concat_back = [concat_dim](shared_ptr<Tensor> t3) {
-    concatenate_backward_matrix(t3, concat_dim);
-  };
-
-  shared_ptr<Tensor> t3 = make_shared<Tensor>(
-      vector<double>(new_size, 0.), new_shape, logger, t1, t2, concat_back);
-  vector<int> new_position{};
-  recurse_concatenate_forward_matrix(t3, t1, t2, new_position, 0, concat_dim);
   return t3;
 }
 
@@ -1125,14 +786,14 @@ inline void recurse_softmax_backward(const shared_ptr<Tensor> t3,
     return;
   }
 
-  new_position.push_back(0);
-  int position_index = new_position.size() - 1;
+  // new_position.push_back(0);
+  // int position_index = new_position.size() - 1;
 
   for (int i = 0; i < t3->shape[axis]; i++) {
-    new_position[position_index] = i;
+    new_position[axis] = i;
     recurse_softmax_backward(t3, t1, new_position, axis + 1);
   }
-  new_position.pop_back();
+  // new_position.pop_back();
 }
 
 inline void softmax_backward(shared_ptr<Tensor> t3) {
@@ -1140,7 +801,7 @@ inline void softmax_backward(shared_ptr<Tensor> t3) {
   shared_ptr<Tensor> t1 = t3->input_first;
   if (!t1)
     return;
-  vector<int> new_position{};
+  vector<int> new_position(t3->shape.size() - 2, 0);
   recurse_softmax_backward(t3, t1, new_position);
 }
 
@@ -1172,14 +833,10 @@ inline void recurse_softmax_forward(shared_ptr<Tensor> t3,
     return;
   }
 
-  new_position.push_back(0);
-  int position_index = new_position.size() - 1;
-
   for (int i = 0; i < t3->shape[axis]; i++) {
-    new_position[position_index] = i;
+    new_position[axis] = i;
     recurse_softmax_forward(t3, t1, new_position, axis + 1);
   }
-  new_position.pop_back();
 }
 
 inline shared_ptr<Tensor> softmax_forward(shared_ptr<Tensor> t1) {
@@ -1187,7 +844,7 @@ inline shared_ptr<Tensor> softmax_forward(shared_ptr<Tensor> t1) {
   shared_ptr<Tensor> t3 =
       make_shared<Tensor>(vector<double>(t1->values.size(), 0.), t1->shape,
                           logger, t1, nullptr, softmax_backward);
-  vector<int> new_position{};
+  vector<int> new_position(t3->shape.size() - 2, 0);
   recurse_softmax_forward(t3, t1, new_position);
   return t3;
 }
@@ -1220,15 +877,11 @@ recurse_cross_entropy_backward(shared_ptr<Tensor> predicted,
     return;
   }
 
-  new_position.push_back(0);
-  int position_index = new_position.size() - 1;
-
   for (int i = 0; i < predicted->shape[axis]; i++) {
-    new_position[position_index] = i;
+    new_position[axis] = i;
     recurse_cross_entropy_backward(predicted, ground_truth, new_position,
                                    axis + 1);
   }
-  new_position.pop_back();
 }
 
 inline void cross_entropy_backward(shared_ptr<Tensor> loss) {
@@ -1237,7 +890,7 @@ inline void cross_entropy_backward(shared_ptr<Tensor> loss) {
   if (!predicted)
     return;
   shared_ptr<Tensor> ground_truth = loss->input_second;
-  vector<int> new_position{};
+  vector<int> new_position(predicted->shape.size() - 2, 0);
   recurse_cross_entropy_backward(predicted, ground_truth, new_position);
 }
 
@@ -1281,15 +934,11 @@ inline void recurse_cross_entropy_forward(shared_ptr<Tensor> loss,
     return;
   }
 
-  new_position.push_back(0);
-  int position_index = new_position.size() - 1;
-
   for (int i = 0; i < loss->shape[axis]; i++) {
-    new_position[position_index] = i;
+    new_position[axis] = i;
     recurse_cross_entropy_forward(loss, predicted, ground_truth, new_position,
                                   axis + 1);
   }
-  new_position.pop_back();
 }
 
 inline shared_ptr<Tensor>
@@ -1316,7 +965,7 @@ categorical_cross_entropy_forward(shared_ptr<Tensor> predicted,
   shared_ptr<Tensor> loss =
       make_shared<Tensor>(loss_values, loss_shape, logger, predicted,
                           ground_truth, cross_entropy_backward);
-  vector<int> new_position{};
+  vector<int> new_position(loss->shape.size() - 2, 0);
   recurse_cross_entropy_forward(loss, predicted, ground_truth, new_position);
   return loss;
 }
