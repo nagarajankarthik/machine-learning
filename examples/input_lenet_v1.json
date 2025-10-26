@@ -82,10 +82,10 @@
                     "init_method": "pytorch"
                 }
             ],
-			"random_seed": 1234,
+			"random_seed": 9871,
             "optimizer": {
                 "type":"sgd",
-                "learning_rate": 0.01,
+                "learning_rate": 0.001,
                 "momentum": 0.9
             },
             "loss": "cross_entropy"
