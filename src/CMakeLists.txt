@@ -11,6 +11,9 @@ add_executable(ml main.cpp)
 # include directories
 target_include_directories(ml PRIVATE "${PROJECT_SOURCE_DIR}")
 
+# compile options
+target_compile_options(ml PRIVATE -Wall -g -O3)
+
 # link libraries
 target_link_libraries(ml PRIVATE neural_network utils tensor ensemble base_model)
 
