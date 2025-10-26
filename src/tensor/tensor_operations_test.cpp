@@ -28,7 +28,7 @@ protected:
   }
 };
 TEST_F(TensorOpsTest, AddForwardTest) {
-  shared_ptr<Tensor> c = add_batch_forward(a, b);
+  shared_ptr<Tensor> c = add_tensor_forward(a, b);
   logger->log(INFO, "Created tensor c by adding a and b.");
   vector<int> position{0};
   vector<vector<double>> matrix = c->get_matrix(position, "values");
@@ -40,7 +40,7 @@ TEST_F(TensorOpsTest, AddForwardTest) {
 }
 
 TEST_F(TensorOpsTest, AddBackwardTest) {
-  shared_ptr<Tensor> c = add_batch_forward(a, b);
+  shared_ptr<Tensor> c = add_tensor_forward(a, b);
   logger->log(INFO, "Created tensor c by adding a and b.");
   fill(c->gradients.begin(), c->gradients.end(), 0.);
   fill(c->gradients.begin() + 4, c->gradients.end(), 1.);
