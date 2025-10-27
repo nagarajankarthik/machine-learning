@@ -1,6 +1,7 @@
 #include "json.hpp"
 #include "logging.h"
 #include <memory>
+#include <mpi.h>
 #include <random>
 #include <string>
 #include <vector>
@@ -87,17 +88,31 @@ public:
   nlohmann::json_abi_v3_11_3::json read_json(std::string inputFileName);
 
   /**
-   * Read data for features and outputs from a user-specified data file
-   * The first line of the file must being with two integers specifying
+   * Read data for features and outputs from a user-specified csv file
+   * The first line of the file must begin with two integers specifying
    * the number of columns containing features and outputs respectively.
    *
-   * @param dataFileName: Absolute path to data file.
+   * @param data_file: Absolute path to data file.
    * @param features: Array to store data for features.
    * @param outputs: Array to store data for outputs.
    */
-  void read_data(std::string data_file,
-                 std::vector<std::vector<double>> &features,
-                 std::vector<std::vector<double>> &outputs,
-                 char delimiter = ',');
+  void read_data_csv(std::string data_file,
+                     std::vector<std::vector<double>> &features,
+                     std::vector<std::vector<double>> &outputs,
+                     char delimiter = ',');
+
+  /**
+   * Read data for features and outputs from a binary file
+   * The first line of the file must begin with two integers specifying
+   * the number of columns containing features and outputs respectively.
+   *
+   * @param data_file: Absolute path to data file.
+   * @param features: Array to store data for features.
+   * @param outputs: Array to store data for outputs.
+   */
+  void read_data_bin(std::string data_file,
+                     std::vector<std::vector<double>> &features,
+                     std::vector<std::vector<double>> &outputs,
+                     bool distributed = true);
 };
 } // namespace ml
