@@ -1,7 +1,9 @@
 #include "ensemble/random_forest_classifier.h"
 #include "neural_network/neural_network.h"
 #include "utils/utils.h"
+#include <cstdlib>
 #include <memory>
+#include <mpi.h>
 
 using namespace std;
 using namespace ml;
@@ -47,6 +49,7 @@ void run_model(Utilities &utils, nlohmann::json model_parameters,
 }
 
 int main(int argc, char *argv[]) {
+  MPI_Init(&argc, &argv);
   string input_file = "input.json";
   if (argc > 1)
     input_file = argv[1];
@@ -70,5 +73,7 @@ int main(int argc, char *argv[]) {
     run_model(utils, model_parameters, logger);
   }
 
-  return 0;
+  MPI_Finalize();
+
+  return EXIT_SUCCESS;
 }
