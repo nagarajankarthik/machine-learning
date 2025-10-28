@@ -96,7 +96,8 @@ public:
    * @param features: Array to store data for features.
    * @param outputs: Array to store data for outputs.
    */
-  void read_data_csv(std::string data_file,
+  void read_data_csv(std::string data_file, int number_features,
+                     int number_outputs,
                      std::vector<std::vector<double>> &features,
                      std::vector<std::vector<double>> &outputs,
                      char delimiter = ',');
@@ -110,7 +111,8 @@ public:
    * @param features: Array to store data for features.
    * @param outputs: Array to store data for outputs.
    */
-  void read_data_bin(std::string data_file,
+  void read_data_bin(std::string data_file, int number_features,
+                     int number_outputs,
                      std::vector<std::vector<double>> &features,
                      std::vector<std::vector<double>> &outputs,
                      bool distributed = true);
