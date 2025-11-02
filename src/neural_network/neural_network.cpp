@@ -9,14 +9,17 @@ NeuralNetwork::NeuralNetwork(nlohmann::json parameters,
                              shared_ptr<Logger> logger)
     : BaseModel(parameters, logger) {
 
-  if (parameters.contains("batch_size")) {
-    int batch_size_input = parameters["batch_size"];
-    if (batch_size_input > 0)
-      batch_size = batch_size_input;
+  int global_rank, world_size;
+  MPI_Comm_rank(MPI_COMM_WORLD, &global_rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+  if (parameters.contains("global_batch_size")) {
+    int global_batch_size_input = parameters["global_batch_size"];
+    if (global_batch_size_input > 0)
+      micro_batch_size = global_batch_size_input / world_size;
     else
       logger->log(
           WARNING,
-          "The specified batch size, " + to_string(batch_size_input) +
+          "The specified batch size, " + to_string(global_batch_size_input) +
               " is invalid. The default batch size of 1 will be used instead.");
   }
   if (parameters.contains("number_epochs")) {
@@ -33,6 +36,7 @@ NeuralNetwork::NeuralNetwork(nlohmann::json parameters,
   labels_shape = parameters["labels_shape"].get<vector<int>>();
   nlohmann::json layer_specifications = parameters["layers"];
   vector<shared_ptr<Tensor>> optimize_params{};
+  int gradient_buffer_size = 0;
   for (nlohmann::json::iterator it = layer_specifications.begin();
        it != layer_specifications.end(); ++it) {
     nlohmann::json layer_parameters = *it;
@@ -74,8 +78,11 @@ NeuralNetwork::NeuralNetwork(nlohmann::json parameters,
     }
     if (layer != nullptr) {
       layers.push_back(layer);
+      gradient_buffer_size += layer->weights->gradients.size();
+      gradient_buffer_size += layer->bias->gradients.size();
     }
   }
+  gradient_buffer.resize(gradient_buffer_size, 0.0);
   nlohmann::json optimizer_type = parameters["optimizer"]["type"];
   if (optimizer_type == "sgd") {
     optimizer = make_shared<SGDOptimizer>(
@@ -89,6 +96,37 @@ NeuralNetwork::NeuralNetwork(nlohmann::json parameters,
   }
   string loss_type = parameters["loss"];
   loss_function = _loss_functions[loss_type];
+}
+
+void NeuralNetwork::collect_gradients() {
+  int gradient_buffer_index = 0;
+  for (auto &layer : layers) {
+    for (int i = 0; i < layer->weights->gradients.size(); i++) {
+      gradient_buffer[gradient_buffer_index++] = layer->weights->gradients[i];
+    }
+    for (int i = 0; i < layer->bias->gradients.size(); i++) {
+      gradient_buffer[gradient_buffer_index++] = layer->bias->gradients[i];
+    }
+  }
+}
+
+void NeuralNetwork::update_gradients() {
+  int gradient_buffer_index = 0;
+  for (auto &layer : layers) {
+    for (int i = 0; i < layer->weights->gradients.size(); i++) {
+      layer->weights->gradients[i] = gradient_buffer[gradient_buffer_index++];
+    }
+    for (int i = 0; i < layer->bias->gradients.size(); i++) {
+      layer->bias->gradients[i] = gradient_buffer[gradient_buffer_index++];
+    }
+  }
+}
+
+void NeuralNetwork::communicate_gradients() {
+  collect_gradients();
+  MPI_Allreduce(MPI_IN_PLACE, gradient_buffer.data(), gradient_buffer.size(),
+                MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  update_gradients();
 }
 
 void NeuralNetwork::prepare_inference_input(
@@ -132,13 +170,19 @@ void NeuralNetwork::prepare_train_input(const vector<vector<double>> &features,
   int number_training_examples = features.size();
   int number_features = features[0].size();
   int number_outputs = labels[0].size();
-  int number_batches = number_training_examples / batch_size;
-  int first_batch_size = batch_size + (number_training_examples % batch_size);
+  int number_batches = number_training_examples / micro_batch_size;
+  int first_micro_batch_size =
+
+      micro_batch_size + (number_training_examples % micro_batch_size);
 
   // prepare input tensor for first batch
-  vector<double> first_batch_input(first_batch_size * number_features, 0.0);
-  vector<double> first_batch_labels(first_batch_size * number_outputs, 0.0);
-  for (int i = 0; i < first_batch_size; i++) {
+
+  vector<double> first_batch_input(first_micro_batch_size * number_features,
+
+                                   0.0);
+  vector<double> first_batch_labels(first_micro_batch_size * number_outputs,
+                                    0.0);
+  for (int i = 0; i < first_micro_batch_size; i++) {
     for (int j = 0; j < number_features; j++) {
       first_batch_input[i * number_features + j] = features[i][j];
     }
@@ -148,8 +192,8 @@ void NeuralNetwork::prepare_train_input(const vector<vector<double>> &features,
   }
   vector<int> first_input_shape(input_shape.begin(), input_shape.end());
   vector<int> first_labels_shape(labels_shape.begin(), labels_shape.end());
-  first_input_shape[0] = first_batch_size;
-  first_labels_shape[0] = first_batch_size;
+  first_input_shape[0] = first_micro_batch_size;
+  first_labels_shape[0] = first_micro_batch_size;
   shared_ptr<Tensor> test_tensor =
       make_shared<Tensor>(vector<double>(4, 0.), vector<int>(2, 2), logger);
   shared_ptr<Tensor> first_input_tensor =
@@ -161,10 +205,10 @@ void NeuralNetwork::prepare_train_input(const vector<vector<double>> &features,
 
   // prepare input tensor for subsequent batches
   for (int i = 1; i < number_batches; i++) {
-    vector<double> batch_input(batch_size * number_features, 0.0);
-    vector<double> batch_labels(batch_size * number_outputs, 0.0);
-    for (int j = 0; j < batch_size; j++) {
-      int ind = first_batch_size + (i - 1) * batch_size + j;
+    vector<double> batch_input(micro_batch_size * number_features, 0.0);
+    vector<double> batch_labels(micro_batch_size * number_outputs, 0.0);
+    for (int j = 0; j < micro_batch_size; j++) {
+      int ind = first_micro_batch_size + (i - 1) * micro_batch_size + j;
       for (int k = 0; k < number_features; k++) {
         batch_input[j * number_features + k] = features[ind][k];
       }
@@ -208,6 +252,8 @@ void NeuralNetwork::train_epoch(int current_epoch) {
                           " and batch " + to_string(i + 1) + ": " +
                           to_string(total_loss));
     loss->backward();
+    MPI_Barrier(MPI_COMM_WORLD);
+    communicate_gradients();
     optimizer->step();
   }
 }
