@@ -66,8 +66,11 @@ NeuralNetwork::NeuralNetwork(nlohmann::json parameters,
           layer_parameters["dilation_kernel"], layer_parameters["pooling_type"],
           logger);
     } else if (layer_type == "reshape") {
-      layer =
-          make_shared<ReshapeLayer>(layer_parameters["target_shape"], logger);
+      vector<int> target_shape =
+          layer_parameters["target_shape"].get<vector<int>>();
+      target_shape[0] = target_shape[0] / world_size;
+
+      layer = make_shared<ReshapeLayer>(target_shape, logger);
     } else if (layer_type == "batch_norm") {
       layer = make_shared<BatchNormLayer>(layer_parameters["number_features"],
                                           layer_parameters["momentum"],
@@ -78,6 +81,8 @@ NeuralNetwork::NeuralNetwork(nlohmann::json parameters,
     }
     if (layer != nullptr) {
       layers.push_back(layer);
+      if (layer->weights == nullptr)
+        continue;
       gradient_buffer_size += layer->weights->gradients.size();
       gradient_buffer_size += layer->bias->gradients.size();
     }
@@ -101,6 +106,8 @@ NeuralNetwork::NeuralNetwork(nlohmann::json parameters,
 void NeuralNetwork::collect_gradients() {
   int gradient_buffer_index = 0;
   for (auto &layer : layers) {
+    if (layer->weights == nullptr)
+      continue;
     for (int i = 0; i < layer->weights->gradients.size(); i++) {
       gradient_buffer[gradient_buffer_index++] = layer->weights->gradients[i];
     }
@@ -113,6 +120,8 @@ void NeuralNetwork::collect_gradients() {
 void NeuralNetwork::update_gradients() {
   int gradient_buffer_index = 0;
   for (auto &layer : layers) {
+    if (layer->weights == nullptr)
+      continue;
     for (int i = 0; i < layer->weights->gradients.size(); i++) {
       layer->weights->gradients[i] = gradient_buffer[gradient_buffer_index++];
     }
