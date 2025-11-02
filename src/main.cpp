@@ -31,7 +31,6 @@ void run_model(Utilities &utils, nlohmann::json model_parameters,
                            " is currently unsupported.");
     return;
   }
-  TrainTestData train_test = utils.get_train_test_data(model_parameters);
   if (model_parameters.contains("data")) {
     string data_path = model_parameters["data"];
     logger->log(INFO, "Data file used was " + data_path);
@@ -41,6 +40,7 @@ void run_model(Utilities &utils, nlohmann::json model_parameters,
     logger->log(INFO, "Train data file used was " + train_data_path);
     logger->log(INFO, "Test data file used was " + test_data_path);
   }
+  TrainTestData train_test = utils.get_train_test_data(model_parameters);
   model->set_data(std::move(train_test));
   logger->log(INFO, "Training " + model_type);
   model->fit();
