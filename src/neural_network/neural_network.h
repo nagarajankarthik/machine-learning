@@ -3,6 +3,7 @@
 #include "optimizer.h"
 
 #include <memory>
+#include <mpi.h>
 #include <omp.h>
 #include <random>
 #include <vector>
@@ -53,7 +54,12 @@ public:
   /**
    * Batch size
    */
-  int batch_size = 1;
+  int micro_batch_size = 1;
+
+  /**
+   * Gradient buffer used for MPI communication
+   */
+  vector<double> gradient_buffer{};
 
   /**
    * Optimizer
@@ -140,6 +146,21 @@ public:
    * Evaluate model using test data
    */
   void evaluate();
+
+  /**
+   * Collect gradients from all layers before communication
+   */
+  void collect_gradients();
+
+  /**
+   * Update gradients in each layer after MPI Allreduce operation
+   */
+  void update_gradients();
+
+  /**
+   * Communicate gradients between processes
+   */
+  void communicate_gradients();
 };
 
 } // namespace ml
