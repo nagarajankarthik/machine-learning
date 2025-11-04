@@ -57,6 +57,16 @@ public:
   int micro_batch_size = 1;
 
   /**
+   * Global MPI rank
+   */
+  int global_rank = 0;
+
+  /**
+   * Number of MPI processes
+   */
+  int world_size = 1;
+
+  /**
    * Gradient buffer used for MPI communication
    */
   vector<double> gradient_buffer{};
