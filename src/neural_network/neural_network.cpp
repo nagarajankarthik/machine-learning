@@ -9,9 +9,10 @@ NeuralNetwork::NeuralNetwork(nlohmann::json parameters,
                              shared_ptr<Logger> logger)
     : BaseModel(parameters, logger) {
 
-  int global_rank, world_size;
   MPI_Comm_rank(MPI_COMM_WORLD, &global_rank);
   MPI_Comm_size(MPI_COMM_WORLD, &world_size);
+  logger->log(INFO, "Global rank: " + to_string(global_rank));
+  logger->log(INFO, "Number of processes: " + to_string(world_size));
   if (parameters.contains("global_batch_size")) {
     int global_batch_size_input = parameters["global_batch_size"];
     if (global_batch_size_input > 0)
@@ -181,9 +182,15 @@ void NeuralNetwork::prepare_train_input(const vector<vector<double>> &features,
   int number_outputs = labels[0].size();
   int number_batches = number_training_examples / micro_batch_size;
   int first_micro_batch_size =
-
       micro_batch_size + (number_training_examples % micro_batch_size);
 
+  logger->log(INFO, "Number of training examples: " +
+                        to_string(number_training_examples));
+  logger->log(INFO, "Number of features: " + to_string(number_features));
+  logger->log(INFO, "Number of outputs: " + to_string(number_outputs));
+  logger->log(INFO, "Number of batches: " + to_string(number_batches));
+  logger->log(INFO,
+              "First micro batch size: " + to_string(first_micro_batch_size));
   // prepare input tensor for first batch
 
   vector<double> first_batch_input(first_micro_batch_size * number_features,
@@ -203,8 +210,6 @@ void NeuralNetwork::prepare_train_input(const vector<vector<double>> &features,
   vector<int> first_labels_shape(labels_shape.begin(), labels_shape.end());
   first_input_shape[0] = first_micro_batch_size;
   first_labels_shape[0] = first_micro_batch_size;
-  shared_ptr<Tensor> test_tensor =
-      make_shared<Tensor>(vector<double>(4, 0.), vector<int>(2, 2), logger);
   shared_ptr<Tensor> first_input_tensor =
       make_shared<Tensor>(first_batch_input, first_input_shape, logger);
   shared_ptr<Tensor> first_labels_tensor =
@@ -225,10 +230,14 @@ void NeuralNetwork::prepare_train_input(const vector<vector<double>> &features,
         batch_labels[j * number_outputs + k] = labels[ind][k];
       }
     }
+    vector<int> train_input_shape(input_shape.begin(), input_shape.end());
+    vector<int> train_labels_shape(labels_shape.begin(), labels_shape.end());
+    train_input_shape[0] = micro_batch_size;
+    train_labels_shape[0] = micro_batch_size;
     shared_ptr<Tensor> input_tensor =
-        make_shared<Tensor>(batch_input, input_shape, logger);
+        make_shared<Tensor>(batch_input, train_input_shape, logger);
     shared_ptr<Tensor> labels_tensor =
-        make_shared<Tensor>(batch_labels, labels_shape, logger);
+        make_shared<Tensor>(batch_labels, train_labels_shape, logger);
     train_inputs.push_back(input_tensor);
     train_labels.push_back(labels_tensor);
   }
