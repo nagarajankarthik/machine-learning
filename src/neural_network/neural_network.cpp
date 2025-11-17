@@ -33,6 +33,16 @@ NeuralNetwork::NeuralNetwork(nlohmann::json parameters,
                                " is invalid. The default number of epochs, 1, "
                                "will be used instead.");
   }
+  if (parameters.contains("max_batches_per_epoch")) {
+    int max_batches_per_epoch_input = parameters["max_batches_per_epoch"];
+    if (max_batches_per_epoch_input > 0)
+      max_batches_per_epoch = max_batches_per_epoch_input;
+    else
+      logger->log(WARNING, "The specified number of batches per epoch, " +
+                               to_string(max_batches_per_epoch_input) +
+                               " is invalid. The default number of batches per "
+                               "epoch, 1, will be used instead.");
+  }
   input_shape = parameters["input_shape"].get<vector<int>>();
   labels_shape = parameters["labels_shape"].get<vector<int>>();
   nlohmann::json layer_specifications = parameters["layers"];
@@ -162,10 +172,85 @@ void NeuralNetwork::prepare_inference_input(
   vector<int> inference_labels_shape(labels_shape.begin(), labels_shape.end());
   inference_input_shape[0] = features.size();
   inference_labels_shape[0] = labels.size();
-  inference_inputs =
-      make_shared<Tensor>(input_values, inference_input_shape, logger);
-  inference_labels =
-      make_shared<Tensor>(label_values, inference_labels_shape, logger);
+  // inference_inputs =
+  //     make_shared<Tensor>(input_values, inference_input_shape, logger);
+  // inference_labels =
+  //     make_shared<Tensor>(label_values, inference_labels_shape, logger);
+}
+void NeuralNetwork::prepare_inputs_labels(
+    const vector<vector<double>> &features,
+    const vector<vector<double>> &labels,
+    vector<shared_ptr<Tensor>> &prepared_inputs,
+    vector<shared_ptr<Tensor>> &prepared_labels) {
+
+  if (features.size() != labels.size()) {
+    logger->log(
+        ERROR,
+        "Features and Labels datasets have different numbers of records.");
+    exit(EXIT_FAILURE);
+  }
+  int number_instances = features.size();
+  int number_features = features[0].size();
+  int number_outputs = labels[0].size();
+  int number_batches = number_instances / micro_batch_size;
+  int first_micro_batch_size =
+      micro_batch_size + (number_instances % micro_batch_size);
+
+  logger->log(INFO, "Number of instances: " + to_string(number_instances));
+  logger->log(INFO, "Number of features: " + to_string(number_features));
+  logger->log(INFO, "Number of outputs: " + to_string(number_outputs));
+  logger->log(INFO, "Number of batches: " + to_string(number_batches));
+  logger->log(INFO,
+              "First micro batch size: " + to_string(first_micro_batch_size));
+
+  // prepare input tensor for first batch
+  vector<double> first_batch_input(first_micro_batch_size * number_features,
+                                   0.0);
+  vector<double> first_batch_labels(first_micro_batch_size * number_outputs,
+                                    0.0);
+  for (int i = 0; i < first_micro_batch_size; i++) {
+    for (int j = 0; j < number_features; j++) {
+      first_batch_input[i * number_features + j] = features[i][j];
+    }
+    for (int j = 0; j < number_outputs; j++) {
+      first_batch_labels[i * number_outputs + j] = labels[i][j];
+    }
+  }
+  vector<int> first_input_shape(input_shape.begin(), input_shape.end());
+  vector<int> first_labels_shape(labels_shape.begin(), labels_shape.end());
+  first_input_shape[0] = first_micro_batch_size;
+  first_labels_shape[0] = first_micro_batch_size;
+  shared_ptr<Tensor> first_input_tensor =
+      make_shared<Tensor>(first_batch_input, first_input_shape, logger);
+  shared_ptr<Tensor> first_labels_tensor =
+      make_shared<Tensor>(first_batch_labels, first_labels_shape, logger);
+  prepared_inputs.push_back(first_input_tensor);
+  prepared_labels.push_back(first_labels_tensor);
+
+  // prepare input tensor for subsequent batches
+  for (int i = 1; i < number_batches; i++) {
+    vector<double> batch_input(micro_batch_size * number_features, 0.0);
+    vector<double> batch_labels(micro_batch_size * number_outputs, 0.0);
+    for (int j = 0; j < micro_batch_size; j++) {
+      int ind = first_micro_batch_size + (i - 1) * micro_batch_size + j;
+      for (int k = 0; k < number_features; k++) {
+        batch_input[j * number_features + k] = features[ind][k];
+      }
+      for (int k = 0; k < number_outputs; k++) {
+        batch_labels[j * number_outputs + k] = labels[ind][k];
+      }
+    }
+    vector<int> train_input_shape(input_shape.begin(), input_shape.end());
+    vector<int> train_labels_shape(labels_shape.begin(), labels_shape.end());
+    train_input_shape[0] = micro_batch_size;
+    train_labels_shape[0] = micro_batch_size;
+    shared_ptr<Tensor> input_tensor =
+        make_shared<Tensor>(batch_input, train_input_shape, logger);
+    shared_ptr<Tensor> labels_tensor =
+        make_shared<Tensor>(batch_labels, train_labels_shape, logger);
+    prepared_inputs.push_back(input_tensor);
+    prepared_labels.push_back(labels_tensor);
+  }
 }
 
 void NeuralNetwork::prepare_train_input(const vector<vector<double>> &features,
@@ -177,15 +262,14 @@ void NeuralNetwork::prepare_train_input(const vector<vector<double>> &features,
         "Features and Labels datasets have different numbers of records.");
     exit(EXIT_FAILURE);
   }
-  int number_training_examples = features.size();
+  int number_instances = features.size();
   int number_features = features[0].size();
   int number_outputs = labels[0].size();
-  int number_batches = number_training_examples / micro_batch_size;
+  int number_batches = number_instances / micro_batch_size;
   int first_micro_batch_size =
-      micro_batch_size + (number_training_examples % micro_batch_size);
+      micro_batch_size + (number_instances % micro_batch_size);
 
-  logger->log(INFO, "Number of training examples: " +
-                        to_string(number_training_examples));
+  logger->log(INFO, "Number of instances: " + to_string(number_instances));
   logger->log(INFO, "Number of features: " + to_string(number_features));
   logger->log(INFO, "Number of outputs: " + to_string(number_outputs));
   logger->log(INFO, "Number of batches: " + to_string(number_batches));
@@ -194,7 +278,6 @@ void NeuralNetwork::prepare_train_input(const vector<vector<double>> &features,
   // prepare input tensor for first batch
 
   vector<double> first_batch_input(first_micro_batch_size * number_features,
-
                                    0.0);
   vector<double> first_batch_labels(first_micro_batch_size * number_outputs,
                                     0.0);
@@ -243,15 +326,32 @@ void NeuralNetwork::prepare_train_input(const vector<vector<double>> &features,
   }
 }
 
-void NeuralNetwork::set_data(TrainTestData &&train_test) {
-  prepare_train_input(train_test.train_features, train_test.train_labels);
-  prepare_inference_input(train_test.test_features, train_test.test_labels);
+void NeuralNetwork::prepare_inference_categories(
+    const vector<vector<double>> &validation_labels) {
+  inference_categories.resize(validation_labels.size());
+  fill(inference_categories.begin(), inference_categories.end(),
+       vector<double>{0.});
+  for (int i = 0; i < validation_labels.size(); i++) {
+    int current_category =
+        max_element(validation_labels[i].begin(), validation_labels[i].end()) -
+        validation_labels[i].begin();
+    inference_categories[i][0] = 1. * current_category;
+  }
 }
 
-void NeuralNetwork::train_epoch(int current_epoch) {
+void NeuralNetwork::set_data(TrainTestData &&train_test) {
+  prepare_inputs_labels(train_test.train_features, train_test.train_labels,
+                        train_inputs, train_labels);
+  prepare_inputs_labels(train_test.test_features, train_test.test_labels,
+                        inference_inputs, inference_labels);
+  prepare_inference_categories(train_test.test_labels);
+}
+
+void NeuralNetwork::train_epoch() {
   shared_ptr<Tensor> current_value = nullptr;
   shared_ptr<Tensor> loss = nullptr;
-  for (int i = 0; i < train_inputs.size(); i++) {
+  for (int i = 0; i < min(max_batches_per_epoch, (int)train_inputs.size());
+       i++) {
     optimizer->zero_gradients();
     current_value = train_inputs[i];
     ForwardParams forward_params{current_value, true};
@@ -276,32 +376,40 @@ void NeuralNetwork::train_epoch(int current_epoch) {
   }
 }
 
-shared_ptr<Tensor> NeuralNetwork::validate(int current_epoch) {
-  shared_ptr<Tensor> current_value = inference_inputs;
+shared_ptr<Tensor> NeuralNetwork::validate() {
+  shared_ptr<Tensor> current_value = nullptr;
   shared_ptr<Tensor> loss = nullptr;
-  ForwardParams forward_params{current_value, false};
-
-  for (auto &layer : layers) {
-    current_value = layer->forward(forward_params);
-    forward_params.input = current_value;
-  }
-  loss = loss_function(current_value, inference_labels);
+  shared_ptr<Tensor> predicted_tensor = nullptr;
   double total_loss = 0.0;
-  for (int i = 0; i < loss->values.size(); i++) {
-    if (loss->values[i] < 0.0)
-      logger->log(ERROR, to_string(i) + ": " + to_string(loss->values[i]));
-    total_loss += loss->values[i];
-    // logger->log(INFO, to_string(loss->values[i]));
+  for (int i = 0; i < inference_inputs.size(); i++) {
+    current_value = inference_inputs[i];
+    ForwardParams forward_params{current_value, false};
+
+    for (auto &layer : layers) {
+      current_value = layer->forward(forward_params);
+      forward_params.input = current_value;
+    }
+    predicted_tensor =
+        i == 0 ? current_value
+               : concatenate_forward(predicted_tensor, current_value, 0);
+    loss = loss_function(current_value, inference_labels[i]);
+    for (int i = 0; i < loss->values.size(); i++) {
+      if (loss->values[i] < 0.0)
+        logger->log(ERROR, to_string(i) + ": " + to_string(loss->values[i]));
+      total_loss += loss->values[i];
+    }
   }
   logger->log(INFO, "Validation loss at epoch " + to_string(current_epoch) +
-                        ": " + to_string(total_loss));
-  return current_value;
+                        " on rank " + to_string(global_rank) + ": " +
+                        to_string(total_loss));
+  return predicted_tensor;
 }
 
 void NeuralNetwork::fit() {
   for (int i = 0; i < number_epochs; i++) {
-    train_epoch(i + 1);
-    validate(i + 1);
+    current_epoch = i + 1;
+    train_epoch();
+    evaluate();
   }
 }
 
@@ -309,12 +417,12 @@ void NeuralNetwork::fit() {
 vector<vector<double>> NeuralNetwork::predict() {
   shared_ptr<Tensor> current_value = nullptr;
   shared_ptr<Tensor> loss = nullptr;
-  ForwardParams forward_params{inference_inputs, false};
+  ForwardParams forward_params{inference_inputs[0], false};
   for (auto &layer : layers) {
     current_value = layer->forward(forward_params);
     forward_params.input = current_value;
   }
-  loss = loss_function(current_value, inference_labels);
+  loss = loss_function(current_value, inference_labels[0]);
   vector<vector<double>> predictions{};
   return predictions;
 }
@@ -341,12 +449,19 @@ NeuralNetwork::get_categories(shared_ptr<Tensor> tensor) {
 }
 
 void NeuralNetwork::evaluate() {
-  shared_ptr<Tensor> predicted_tensor = validate(number_epochs);
+  shared_ptr<Tensor> predicted_tensor = validate();
   vector<vector<double>> predictions_categories =
       get_categories(predicted_tensor);
-  vector<vector<double>> actual_categories = get_categories(inference_labels);
+  int number_outputs =
+      predicted_tensor->shape[predicted_tensor->shape.size() - 1];
+  vector<vector<double>> all_categories(number_outputs, vector<double>{0.});
+  for (int i = 0; i < number_outputs; i++) {
+    all_categories[i][0] = 1. * i;
+  }
   // TODO: Consider including the actual training labels for the last argument
-  get_confusion_matrices(predictions_categories, actual_categories,
-                         actual_categories);
+  logger->log(INFO, "Confusion matrices for epoch " + to_string(current_epoch) +
+                        " on rank " + to_string(global_rank));
+  get_confusion_matrices(predictions_categories, inference_categories,
+                         all_categories);
 }
 } // namespace ml
