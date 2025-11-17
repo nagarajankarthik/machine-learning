@@ -330,6 +330,8 @@ public:
    */
   shared_ptr<Tensor> forward(ForwardParams forward_params) override {
     shared_ptr<Tensor> input = forward_params.input;
+    int batch_size = input->shape[0];
+    target_shape[0] = batch_size;
     assert(input->values.size() == std::accumulate(target_shape.begin(),
                                                    target_shape.end(), 1,
                                                    std::multiplies<int>()));
