@@ -104,7 +104,7 @@ TrainTestData Utilities::get_train_test_data(nlohmann::json model_parameters) {
       read_data_bin(train_data_path, number_features, number_outputs,
                     train_test.train_features, train_test.train_labels);
       read_data_bin(test_data_path, number_features, number_outputs,
-                    train_test.test_features, train_test.test_labels, false);
+                    train_test.test_features, train_test.test_labels);
     }
   }
   if (model_parameters.contains("one_hot_labels")) {
