@@ -39,17 +39,27 @@ public:
   /**
    * Array of input tensors
    */
-  shared_ptr<Tensor> inference_inputs = nullptr;
+  vector<shared_ptr<Tensor>> inference_inputs{};
 
   /**
    * Array of ground truth label tensors
    */
-  shared_ptr<Tensor> inference_labels = nullptr;
+  vector<shared_ptr<Tensor>> inference_labels{};
+
+  /**
+   * Maximum number of batches per epoch. Used for early stopping
+   */
+  int max_batches_per_epoch = 1;
 
   /**
    * Number of epochs
    */
   int number_epochs = 1;
+
+  /**
+   * Current epoch
+   */
+  int current_epoch = 1;
 
   /**
    * Batch size
@@ -82,6 +92,11 @@ public:
   vector<shared_ptr<Layer>> layers{};
 
   /**
+   * Actual categories for validation data
+   */
+  vector<vector<double>> inference_categories{};
+
+  /**
    * Loss functions
    */
   unordered_map<string, function<shared_ptr<Tensor>(shared_ptr<Tensor>,
@@ -112,14 +127,29 @@ public:
   ~NeuralNetwork() {};
 
   /**
+   * Get actual categories from one hot encoded labels
+   */
+  void
+  prepare_inference_categories(const vector<vector<double>> &validation_labels);
+
+  /**
+   * Prepare input tensors for training and inference
+   */
+  void prepare_inputs_labels(const vector<vector<double>> &features,
+                             const vector<vector<double>> &labels,
+                             vector<shared_ptr<Tensor>> &prepared_inputs,
+                             vector<shared_ptr<Tensor>> &prepared_labels);
+  /**
    * Prepare input tensors for training
    */
+  [[deprecated]]
   void prepare_train_input(const vector<vector<double>> &features,
                            const vector<vector<double>> &input_labels);
 
   /**
    * Prepare input tensors for training
    */
+  [[deprecated]]
   void prepare_inference_input(const vector<vector<double>> &features,
                                const vector<vector<double>> &labels);
   /**
@@ -135,12 +165,12 @@ public:
   /**
    * Calculate validation loss.
    */
-  shared_ptr<Tensor> validate(int current_epoch);
+  shared_ptr<Tensor> validate();
 
   /**
    * Perform a single training epoch
    */
-  void train_epoch(int current_epoch);
+  void train_epoch();
 
   /**
    * Convert predictions and labels from tensors to array
