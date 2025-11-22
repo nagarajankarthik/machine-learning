@@ -62,9 +62,14 @@ public:
   int current_epoch = 1;
 
   /**
-   * Batch size
+   * Batch size for training on a single MPI process
    */
-  int micro_batch_size = 1;
+  int micro_batch_size_train = 1;
+
+  /**
+   * Batch size for inference on a single MPI process
+   */
+  int micro_batch_size_inference = 1;
 
   /**
    * Global MPI rank
@@ -138,13 +143,15 @@ public:
   void prepare_inputs_labels(const vector<vector<double>> &features,
                              const vector<vector<double>> &labels,
                              vector<shared_ptr<Tensor>> &prepared_inputs,
-                             vector<shared_ptr<Tensor>> &prepared_labels);
+                             vector<shared_ptr<Tensor>> &prepared_labels,
+                             int micro_batch_size);
   /**
    * Prepare input tensors for training
    */
   [[deprecated]]
   void prepare_train_input(const vector<vector<double>> &features,
-                           const vector<vector<double>> &input_labels);
+                           const vector<vector<double>> &input_labels,
+                           int micro_batch_size);
 
   /**
    * Prepare input tensors for training

@@ -13,14 +13,28 @@ NeuralNetwork::NeuralNetwork(nlohmann::json parameters,
   MPI_Comm_size(MPI_COMM_WORLD, &world_size);
   logger->log(INFO, "Global rank: " + to_string(global_rank));
   logger->log(INFO, "Number of processes: " + to_string(world_size));
-  if (parameters.contains("global_batch_size")) {
-    int global_batch_size_input = parameters["global_batch_size"];
-    if (global_batch_size_input > 0)
-      micro_batch_size = global_batch_size_input / world_size;
+  if (parameters.contains("global_batch_size_train")) {
+    int global_batch_size_train_input = parameters["global_batch_size_train"];
+    if (global_batch_size_train_input > 0)
+      micro_batch_size_train = global_batch_size_train_input / world_size;
     else
       logger->log(
           WARNING,
-          "The specified batch size, " + to_string(global_batch_size_input) +
+          "The specified global batch size for training, " +
+              to_string(global_batch_size_train_input) +
+              " is invalid. The default batch size of 1 will be used instead.");
+  }
+  if (parameters.contains("global_batch_size_inference")) {
+    int global_batch_size_inference_input =
+        parameters["global_batch_size_inference"];
+    if (global_batch_size_inference_input > 0)
+      micro_batch_size_inference =
+          global_batch_size_inference_input / world_size;
+    else
+      logger->log(
+          WARNING,
+          "The specified global batch size for inference, " +
+              to_string(global_batch_size_inference_input) +
               " is invalid. The default batch size of 1 will be used instead.");
   }
   if (parameters.contains("number_epochs")) {
@@ -181,7 +195,7 @@ void NeuralNetwork::prepare_inputs_labels(
     const vector<vector<double>> &features,
     const vector<vector<double>> &labels,
     vector<shared_ptr<Tensor>> &prepared_inputs,
-    vector<shared_ptr<Tensor>> &prepared_labels) {
+    vector<shared_ptr<Tensor>> &prepared_labels, int micro_batch_size) {
 
   if (features.size() != labels.size()) {
     logger->log(
@@ -254,7 +268,8 @@ void NeuralNetwork::prepare_inputs_labels(
 }
 
 void NeuralNetwork::prepare_train_input(const vector<vector<double>> &features,
-                                        const vector<vector<double>> &labels) {
+                                        const vector<vector<double>> &labels,
+                                        int micro_batch_size) {
 
   if (features.size() != labels.size()) {
     logger->log(
@@ -341,9 +356,10 @@ void NeuralNetwork::prepare_inference_categories(
 
 void NeuralNetwork::set_data(TrainTestData &&train_test) {
   prepare_inputs_labels(train_test.train_features, train_test.train_labels,
-                        train_inputs, train_labels);
+                        train_inputs, train_labels, micro_batch_size_train);
   prepare_inputs_labels(train_test.test_features, train_test.test_labels,
-                        inference_inputs, inference_labels);
+                        inference_inputs, inference_labels,
+                        micro_batch_size_inference);
   prepare_inference_categories(train_test.test_labels);
 }
 
